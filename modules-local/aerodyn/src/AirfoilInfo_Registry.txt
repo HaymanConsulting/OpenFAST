@@ -55,7 +55,7 @@ typedef	AirfoilInfo/AFI	AFI_Table_Type	ReKi	Alpha   	{:}	-	-	"Angle-of-attack ve
 typedef	^	^	ReKi	Coefs	{:}{:}	-	-	"Airfoil coefficients for Cd, Cl,  and maybe Cm and/or Cpmin"	-
 typedef	^	^	ReKi	SplineCoefs	{:}{:}{:}	-	-	"Spline coefficients for Cd, Cl,  and maybe Cm and/or Cpmin"	-
 typedef	^	^	ReKi	BEMT_Spline	{:}{:}{:}{:}	-	-	"Spline coefficients for Cd, Cl for the two bounding Re when doing BEM"	-
-typedef	^	^	ReKi	Ctrl    	-	-	-	"Control setting"	"user-specified"
+typedef	^	^	ReKi	UserProp    	-	-	-	"User Property for a table, for example a Control setting" -
 typedef	^	^	ReKi	Re      	-	-	-	"Reynolds numbers in millions"	-
 typedef	^	^	INTEGER	NumAlf  	-	-	-	"Length of the Alpha and Coefs arrays"	-
 typedef	^	^	LOGICAL	ConstData	-	-	-	"Flag that tells if aerodynamic coefficients are the same for all alphas"	-
@@ -101,6 +101,7 @@ typedef	^	^	INTEGER	ColCm	-	-	-	"Column number for Cm"	-
 typedef	AirfoilInfo/AFI	InitInputType	INTEGER	NumAFfiles	-	-	-	"The number of airfoil files"	-
 typedef	^	^	CHARACTER(1024)	FileNames	{:}	-	-	"The name of the file the data were read from"	-
 #typedef	^	^	INTEGER	UA_Model	-	-	-	"The type of unsteady aero model (1-Beddoes-Leishman)"	-
+typedef  ^  ^  INTEGER  DimMod   -  -  -  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
 typedef	^	^	INTEGER	InCol_Alfa	-	-	-	"The column of the coefficient tables that holds the angle of attack"	-
 typedef	^	^	INTEGER	InCol_Cl	-	-	-	"The column of the coefficient tables that holds the lift coefficient"	-
 typedef	^	^	INTEGER	InCol_Cd	-	-	-	"The column of the coefficient tables that holds the minimum pressure coefficient"	-
@@ -118,11 +119,12 @@ typedef	^	^	INTEGER	ColCl	-	-	-	"The column in the Coefs arrays that contains Cl
 typedef	^	^	INTEGER	ColCm	-	-	-	"The column in the Coefs arrays that contains Cm data"	-
 typedef	^	^	INTEGER	ColCpmin	-	-	-	"The column in the Coefs arrays that contains Cpmin data"	-
 typedef	^	^	AFInfoType	AFInfo	{:}	-	-	The derived type that stores all the data from the input files.	-
+typedef  ^  ^  INTEGER  DimMod   -  -  -  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
 
 # ..... Inputs ....................................................................................................................
 # Define inputs that are not on this mesh here:
 typedef	^	InputType	ReKi	AoA	-	-	-	"The angle of attack"	radians
-typedef	^	^	ReKi	Ctrl	-	-	-	"The user-defined control setting"	-
+typedef	^	^	ReKi	UserProp	-	-	-	"The user-defined control setting"	-
 typedef	^	^	ReKi	Re	-	-	-	"Reynolds number"	millions
 
 # ..... Outputs ...................................................................................................................

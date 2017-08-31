@@ -31,18 +31,19 @@ MODULE AirfoilInfo
    USE                                             AirfoilInfo_Types
    USE                                             NWTC_FitPack
    USE                                          :: ISO_FORTRAN_ENV , ONLY : IOSTAT_EOR
-
+   
    IMPLICIT NONE
 
    PRIVATE
 
    PUBLIC                                       :: AFI_Init ! routine to initialize AirfoilInfo parameters
    PUBLIC                                       :: AFI_GetAirfoilParams ! routine to calculate Airfoil parameters
-
+   PUBLIC                                       :: AFI_ComputeAirfoilCoefs2D ! routine to perform a 2D (AOA, Re) lookup of the airfoil coefs
+   
    TYPE(ProgDesc), PARAMETER                    :: AFI_Ver = ProgDesc( 'AirfoilInfo', 'v1.01.01a', '10-May-2017')               ! The name, version, and date of AirfoilInfo.
 
 
-CONTAINS
+   CONTAINS
 
    ! SUBROUTINE AFI_Init         ( InitInput, p, ErrStat, ErrMsg )                                          ! Initialize.  Read in data.  Compute spline coefficients.
    ! SUBROUTINE AirfoilInfo      ( Phase, FileNum, AoA, Re, Ctrl, InitInput, Cl, Cd, Cm, Cpmin, ErrStat, ErrMsg )    ! Main interface routine.
@@ -51,6 +52,26 @@ CONTAINS
    ! SUBROUTINE GetAllCoefs      ( FileNum, AoA, Re, Ctrl, InitInput, Cl, Cd, Cm, Cpmin, ErrStatLcl, ErrMsg )        ! Phase #4: Compute all requested airfoil coefficients for the given AoA.
    ! SUBROUTINE ReadAFfile       ( AFInfo, NumCoefs, Col_Cm, Col_Cpmin, ErrStat, ErrMsg )             ! Read an airfoil file.
 
+   function CheckValuesAreUniqueMonotonicIncreasing(secondVals)
+     
+      real(ReKi),  intent(in   )  :: secondVals(:)
+      logical CheckValuesAreUniqueMonotonicIncreasing
+      
+      
+      integer(IntKi) :: i
+      
+      CheckValuesAreUniqueMonotonicIncreasing = .true.
+      
+      do i = 2, size(secondVals)
+         if ( EqualRealNos(secondVals(i)-secondVals(i-1),0.0_ReKi) .or. (secondVals(i) < secondVals(i-1))) then
+            CheckValuesAreUniqueMonotonicIncreasing = .false.
+            exit
+         end if
+      end do
+      
+       
+   end function CheckValuesAreUniqueMonotonicIncreasing
+   
    !=============================================================================
    SUBROUTINE AFI_Init ( InitInput, p, ErrStat, ErrMsg, UnEcho )
 
@@ -89,7 +110,7 @@ CONTAINS
       INTEGER                                :: ErrStat2                      ! Local error status.
       CHARACTER(ErrMsgLen)                   :: ErrMsg2
       CHARACTER(*), PARAMETER                :: RoutineName = 'AFI_Init'
-      
+      REAL(ReKi), ALLOCATABLE                :: secondVals(:)                 ! The values of the 2nd dependent variable when using multiple airfoil tables
       ErrStat = ErrID_None
       ErrMsg  = ""
 
@@ -103,6 +124,8 @@ CONTAINS
          UnEc = -1
       END IF
              
+         ! Set the lookup model:  1 = 1D, 2 = 2D based on (AoA,Re), 3 = 2D based on (AoA,UserProp)
+      p%DimMod   = 2  
       
          ! Set the column indices for the various airfoil coefficients.
 
@@ -123,7 +146,7 @@ CONTAINS
       
               
          ! Process the airfoil files.
-
+      
       ALLOCATE ( p%AFInfo( InitInput%NumAFfiles ), STAT=ErrStat2 )
       IF ( ErrStat2 /= 0 )  THEN
          CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the p%AFInfo array.', ErrStat, ErrMsg, RoutineName )
@@ -150,44 +173,92 @@ CONTAINS
                RETURN
             ENDIF
 
-
             ! Make sure that all the tables meet the current restrictions.
-
+         
          IF ( p%AFInfo(File)%NumTabs > 1 )  THEN
 
-
+            IF ( p%DimMod == 2 .or. p%DimMod == 3 ) THEN
+               
+               ALLOCATE(secondVals(p%AFInfo(File)%NumTabs), STAT=ErrStat2 )
+                  IF ( ErrStat2 /= 0 )  THEN
+                     CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the p%AFInfo array.', ErrStat, ErrMsg, RoutineName )
+                     RETURN
+                  ENDIF
+                  
                ! Do the tables have the same number and set of alphas.
 
-            DO Table=2,p%AFInfo(File)%NumTabs
+               DO Table=2,p%AFInfo(File)%NumTabs
 
-               IF ( p%AFInfo(File)%Table(Table)%NumAlf /= p%AFInfo(File)%Table(1)%NumAlf )  THEN
-          !     IF ( p%AFInfo(File)%NumTabs /= p%AFInfo(File)%Table(1)%NumAlf )  THEN
-                  CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoile file "'//TRIM( InitInput%FileNames(File) ) &
-                                    //'", Table #'//TRIM( Num2LStr( Table ) ) &
-                                    //' does not have the same set of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
-                  CALL Cleanup()
-                  RETURN
-               ENDIF
-
-               DO IA=1,p%AFInfo(File)%Table(1)%NumAlf
-                  IF ( p%AFInfo(File)%Table(Table)%Alpha(IA) /= p%AFInfo(File)%Table(1)%Alpha(IA) )  THEN
-                     CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoile file "'//TRIM( InitInput%FileNames(File) ) &
-                                    //'", Table #'//TRIM( Num2LStr( Table ) ) &
-                                    //' does not have the same set of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
+                  IF ( p%AFInfo(File)%Table(Table)%NumAlf /= p%AFInfo(File)%Table(1)%NumAlf )  THEN
+                     CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                                       //'", Table #'//TRIM( Num2LStr( Table ) ) &
+                                       //' does not have the same number of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
                      CALL Cleanup()
                      RETURN
                   ENDIF
-               END DO ! IA
 
-               IF ( p%AFInfo(File)%Table(Table)%Ctrl /= p%AFInfo(File)%Table(1)%Ctrl )  THEN
-                  CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoile file "'//TRIM( InitInput%FileNames(File) ) &
+                  DO IA=1,p%AFInfo(File)%Table(1)%NumAlf
+                     IF ( p%AFInfo(File)%Table(Table)%Alpha(IA) /= p%AFInfo(File)%Table(1)%Alpha(IA) )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                                       //'", Table #'//TRIM( Num2LStr( Table ) ) &
+                                       //' does not have the same set of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
+                        CALL Cleanup()
+                        RETURN
+                     ENDIF
+                  END DO ! IA
+                  
+                  IF (p%DimMod == 2) THEN
+                     
+                        ! Ctrl Value must be the same, Re must be monotonic increasing without repeats
+                     IF ( p%AFInfo(File)%Table(Table)%UserProp /= p%AFInfo(File)%Table(1)%UserProp )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                                       //'", Table #'//TRIM( Num2LStr( Table ) ) &
+                                       //' does not have the same value for Ctrl Property (CtrlProp) as the first table.', ErrStat, ErrMsg, RoutineName )
+                        CALL Cleanup()
+                        RETURN
+                     ENDIF
+                     secondVals(Table) = p%AFInfo(File)%Table(Table)%Re
+                     
+                  ELSE IF (p%DimMod == 3) THEN
+                     
+                        ! Re must be the same, Ctrl must be different
+                     IF ( p%AFInfo(File)%Table(Table)%Re /= p%AFInfo(File)%Table(1)%Re )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                                       //'", Table #'//TRIM( Num2LStr( Table ) ) &
+                                       //' does not have the same value for Re Property (ReProp) as the first table.', ErrStat, ErrMsg, RoutineName )
+                        CALL Cleanup()
+                        RETURN
+                     ENDIF
+                     secondVals(Table) = p%AFInfo(File)%Table(Table)%UserProp
+                     
+                  END IF
+                  
+               ENDDO ! Tab
+                  ! Make sure all Re's are monotonic and increasing with no repeats
+               IF (p%DimMod > 1) THEN
+                  
+                  IF (.NOT. CheckValuesAreUniqueMonotonicIncreasing(secondVals)) THEN
+                     ErrMsg2 = 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
                                  //'", Table #'//TRIM( Num2LStr( Table ) ) &
-                                 //' does not have the same value for Ctrl as the first table.', ErrStat, ErrMsg, RoutineName )
-                  CALL Cleanup()
-                  RETURN
-               ENDIF
-            ENDDO ! Tab
-
+                                 //' does not have the same value for '
+                     IF (p%DimMod == 2) THEN
+                        ErrMsg2 = ErrMsg2//'Ctrl Property (CtrlProp) as the first table.'
+                     ELSE
+                        ErrMsg2 = ErrMsg2//'Re Property (ReProp) as the first table.'
+                     END IF
+                     
+                     CALL SetErrStat ( ErrID_Fatal, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+                     CALL Cleanup()
+                     RETURN
+                  ENDIF
+                  
+               END IF
+                
+            ELSE
+               p%AFInfo(File)%NumTabs = 1
+               CALL SetErrStat ( ErrID_Warn, 'DimModel = 1D, therefore only using the first airfoil table in the file: "'//TRIM( InitInput%FileNames(File) ), ErrStat, ErrMsg, RoutineName )
+            END IF
+            
          ENDIF ! ( p%AFInfo(File)%NumTabs > 1 )
 
 
@@ -472,8 +543,8 @@ CONTAINS
       END SUBROUTINE Cleanup 
 
    END SUBROUTINE AFI_Init
-   
-  
+    
+      
    !=============================================================================
    SUBROUTINE ReadAFfile ( AFfile, NumCoefs, InCol_Alfa, InCol_Cl, InCol_Cd, InCol_Cm, InCol_Cpmin, AFInfo &
                          , ErrStat, ErrMsg, UnEc )
@@ -529,14 +600,14 @@ CONTAINS
          ! Process the (possibly) nested set of files.  This copies the decommented contents of
          ! AFI_FileInfo%FileName and the files it includes (both directly and indirectly) into
          ! the FileInfo structure that we can then parse.
-
+  
       CALL ProcessComFile ( AFfile, FileInfo, ErrStat2, ErrMsg2 )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          IF (ErrStat >= AbortErrLev) THEN
             CALL Cleanup()
             RETURN
          END IF
-         
+ 
 
          ! Process the airfoil shape information if it is included.
 
@@ -640,19 +711,19 @@ CONTAINS
                RETURN
          ENDIF ! ( AFInfo%Table(Table)%Re <= 0.0 )
 
-         CALL ParseVar ( FileInfo, CurLine, 'Ctrl', AFInfo%Table(Table)%Ctrl, ErrStat2, ErrMsg2, UnEc )
+         CALL ParseVar ( FileInfo, CurLine, 'Ctrl', AFInfo%Table(Table)%UserProp, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF (ErrStat >= AbortErrLev) THEN
                CALL Cleanup()
                RETURN
             END IF
-         IF ( AFInfo%Table(Table)%Ctrl /= 0.0 )  THEN !bjj: use EqualRealNos?
-               CALL SetErrStat ( ErrID_Severe, 'Ctrl must equal 0.0 in "'//TRIM( AFfile ) &
-                                       //'".'//NewLine//'  >> The error occurred on line #' &
-                                       //TRIM( Num2LStr( FileInfo%FileLine(CurLine-1) ) )//'.', ErrStat, ErrMsg, RoutineName )
-               CALL Cleanup()
-               RETURN
-         ENDIF ! ( AFInfo%Table(Table)%Ctrl <= 0.0 )
+         !IF ( AFInfo%Table(Table)%UserProp /= 0.0 )  THEN !bjj: use EqualRealNos?
+         !      CALL SetErrStat ( ErrID_Severe, 'UserProp must equal 0.0 in "'//TRIM( AFfile ) &
+         !                              //'".'//NewLine//'  >> The error occurred on line #' &
+         !                              //TRIM( Num2LStr( FileInfo%FileLine(CurLine-1) ) )//'.', ErrStat, ErrMsg, RoutineName )
+         !      CALL Cleanup()
+         !      RETURN
+         !ENDIF ! ( AFInfo%Table(Table)%UserProp <= 0.0 )
 
          CALL ParseVar ( FileInfo, CurLine, 'InclUAdata', AFInfo%Table(Table)%InclUAdata, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -884,7 +955,129 @@ CONTAINS
 
    END SUBROUTINE ReadAFfile
       
+!----------------------------------------------------------------------------------------------------------------------------------  
+subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo, &
+                      Cl, Cd, Cm, Cpmin, errStat, errMsg )
+! This routine is calculates Cl, Cd, Cm, (and Cpmin) for a set of tables which are dependent on AOA as well as a 2nd user-defined varible, could be Re or Cntrl, etc.
+! If the requested yVar is not associated with a given table, then the two tables which contain yVar are found and, a cubic spline interpolation is performed at the requested AOA.
+! for each of those two tables. Then a linear intepolation is performed on the 2nd dimension to find the final Cl,Cd,Cm, and Cpmin values.
+! If the requested yVar corresponds to a table, then only a single cubic interpolation based on the requested AOA is performed.
+!..................................................................................................................................
+   integer(IntKi),         intent(in   ) :: interpolant
+   real(ReKi),             intent(in   ) :: AOA
+   real(ReKi),             intent(in   ) :: secondaryDepVal           ! Unused in the current version!     
+   type(AFInfoType),       intent(in   ) :: AFInfo
+   real(ReKi),             intent(  out) :: Cl, Cd, Cm, Cpmin
+   integer(IntKi),         intent(  out) :: errStat       ! Error status of the operation
+   character(*),           intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None 
+   
+   
+   real                            :: IntAFCoefs(4)                ! The interpolated airfoil coefficients.
+   real(reki)                      :: Alpha
+   integer                         :: s1, lowerTable, upperTable, i
+   real(ReKi)                      :: s, lowerVal, dVal, Cl1, Cl2, Cd1, Cd2, Cm1, Cm2, Cpmin1, Cpmin2
       
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   
+   
+      ! check that we have tables which contain specified secondaryDepVal.  If not, throw error
+   lowerTable = 0
+   upperTable = 0
+   do i = 1, AFInfo%NumTabs
+      if (interpolant == 1) then
+         if (AFInfo%Table(i)%Re <= secondaryDepVal) lowerTable = i
+         if (AFInfo%Table(i)%Re >= secondaryDepVal) upperTable = i
+      else
+         if (AFInfo%Table(i)%UserProp <= secondaryDepVal) lowerTable = i
+         if (AFInfo%Table(i)%UserProp >= secondaryDepVal) upperTable = i
+      end if
+      
+   end do
+   
+   if ( lowerTable == 0 .or. upperTable == 0 ) then
+      if (interpolant == 1) then
+         ErrMsg  = "Specified Reynold's number, "//trim(num2lstr(secondaryDepVal))//" , is outside the range of Re specified in the airfoil input file tables."
+      else
+         ErrMsg  = "Specified User Property's value, "//trim(num2lstr(secondaryDepVal))//" , is outside the range of User Property values specified in the airfoil input file tables."
+      end if
+      
+      call SetErrStat ( ErrID_Fatal, ErrMsg, ErrStat, ErrMsg, 'AFI_ComputeAirfoilCoefs2DRe' )
+      return
+   end if
+   
+   IntAFCoefs = 0.0_ReKi ! initialize in case we only don't have 4 columns in the airfoil data (i.e., so cm is zero if not in the file)
+ 
+      ! NOTE: we use Table(1) because the right now we can only interpolate with AOA and not Re or other variables.  If we had multiple tables stored
+      ! for changes in other variables (Re, Mach #, etc) then then we would need to interpolate across tables.
+      !
+   s1 = size(AFInfo%Table(lowerTable)%Coefs,2)
+   
+   Alpha = AOA
+   call MPi2Pi ( Alpha ) ! change AOA into range of -pi to pi
+   
+   
+      ! Spline interpolation of lower table based on requested AOA
+   
+   IntAFCoefs(1:s1) = CubicSplineInterpM( Alpha  &
+                                          , AFInfo%Table(lowerTable)%Alpha &
+                                          , AFInfo%Table(lowerTable)%Coefs &
+                                          , AFInfo%Table(lowerTable)%SplineCoefs &
+                                          , ErrStat, ErrMsg )
+   
+  
+   Cl1    = IntAFCoefs(1)
+   Cd1    = IntAFCoefs(2)
+   Cm1    = 0.0_Reki  !Set these to zero unless there is data to be read in
+   Cpmin1 = 0.0_Reki
+     
+   IF ( AFInfo%ColCm > 0 ) Cm1 = IntAFCoefs(AFInfo%ColCm)
+         
+   IF ( AFInfo%ColCpmin > 0 ) Cpmin1 = IntAFCoefs(AFInfo%ColCpmin)
+      
+   
+      ! Spline interpolation of upper table based on requested AOA
+   
+   IntAFCoefs(1:s1) = CubicSplineInterpM( Alpha  &
+                                          , AFInfo%Table(upperTable)%Alpha &
+                                          , AFInfo%Table(upperTable)%Coefs &
+                                          , AFInfo%Table(upperTable)%SplineCoefs &
+                                          , ErrStat, ErrMsg )
+   
+  
+   Cl2    = IntAFCoefs(1)
+   Cd2    = IntAFCoefs(2)
+   Cm2    = 0.0_Reki  !Set these to zero unless there is data to be read in
+   Cpmin2 = 0.0_Reki
+     
+   IF ( AFInfo%ColCm > 0 ) Cm2 = IntAFCoefs(AFInfo%ColCm)
+         
+   IF ( AFInfo%ColCpmin > 0 ) Cpmin2 = IntAFCoefs(AFInfo%ColCpmin)
+   
+   
+      ! Linearly interpolate between tables
+   if (interpolant == 1) then
+      dVal = (AFInfo%Table(upperTable)%Re - AFInfo%Table(lowerTable)%Re)
+      lowerVal = AFInfo%Table(lowerTable)%Re
+   else
+      dVal = (AFInfo%Table(upperTable)%UserProp - AFInfo%Table(lowerTable)%UserProp)
+      lowerVal = AFInfo%Table(lowerTable)%UserProp
+   end if
+   
+   if (EqualRealNos(dVal, 0.0_ReKi)) then
+      s = 0.0_ReKi
+   else                        
+      s = (secondaryDepVal - lowerVal) / dVal
+   end if
+   
+   Cl = Cl1 + s*Cl2
+   Cd = Cd1 + s*Cd2
+   Cm = Cm1 + s*Cm2
+   Cpmin = Cpmin1 + s*Cpmin2
+   
+end subroutine AFI_ComputeAirfoilCoefs2D  
+                      
+                      
    subroutine AFI_GetAirfoilParams( AFInfo, M, Re, alpha0, alpha1, alpha2, eta_e, C_nalpha, C_nalpha_circ, T_f0, T_V0, T_p, T_VL, St_sh, &
                                     b1, b2, b5, A1, A2, A5, S1, S2, S3, S4, Cn1, Cn2, Cd0, Cm0, k0, k1, k2, k3, k1_hat, x_cp_bar, filtCutOff, errMsg, errStat )     
 
