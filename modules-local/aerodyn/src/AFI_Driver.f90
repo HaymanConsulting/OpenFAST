@@ -29,7 +29,11 @@ program AFI_Driver
    use NWTC_Library
    use AirfoilInfo
    use AirfoilInfo_Types
-   
+#ifdef UNIT_TESTS
+   use AirfoilInfo_Unit
+#endif  
+
+
    implicit none
 
    
@@ -38,83 +42,47 @@ program AFI_Driver
    
     ! Variables
    
-   real(DbKi)  :: dt, t
-   integer     :: i, j, k, n 
+   real(DbKi)  :: dt, t  
+   type(AFI_InitInputType)                       :: initInputs           ! Input data for initialization
+   type(AFI_ParameterType)                       :: p                    ! Parameters
    
-   type(AFI_InitInputType)                        :: InitInputs           ! Input data for initialization
-   type(AFI_ParameterType)                        :: p                    ! Parameters
+   integer(IntKi)                                :: errStat, errStat2    ! Status of error message
+   character(1024)                               :: errMsg, errMsg2      ! Error message if ErrStat /= ErrID_None
    
-   integer(IntKi)                                :: ErrStat, errStat2    ! Status of error message
-   character(1024)                               :: ErrMsg, errMsg2     ! Error message if ErrStat /= ErrID_None
-   
-   integer, parameter                            :: NumAFfiles = 1
-   character(1024)                               :: afNames(NumAFfiles)
    character(1024)                               :: outFileName
    integer                                       :: unOutFile
-   character(200)                                :: TimeFrmt, Frmt 
+   character(200)                                :: timeFrmt, Frmt 
    CHARACTER(1024)                               :: dvrFilename          ! Filename and path for the driver input file.  This is passed in as a command line argument when running the Driver exe.
    integer                                       :: nSteps
    real(DbKi)                                    :: simTime  
    integer                                       :: nSimSteps
-   character(1024)                               :: RoutineName
-   integer                                       :: UnEc
+   character(1024)                               :: routineName
+   integer                                       :: unEc
    character(200)                                :: git_commit           ! This is the git commit hash and tag associated with the codebase
-   
-      ! Initialize the NWTC library
-   call NWTC_Init()
-   
-      ! Initialize variables
-   ErrMsg      = ''
-   ErrStat     = ErrID_None   
-   UnEc        = 0
-   RoutineName = 'AFI_Driver'
+   integer                                       :: i, j, k, n           ! loop counter
+   real(ReKi)                                    :: angleRad, angleDeg, Cl, Cd, Cm, Cpmin
+   integer                                       :: tableIndx(5)
+   real(ReKi)                                    :: ReVal
+      ! Initialize variables  
+   errStat     = ErrID_None   
+   errMsg      = ''
+   unEc        = 0
+   routineName = 'AFI_Driver'
    git_commit  = ''
-   
-#ifdef GIT_COMMIT_HASH
-   git_commit  = GIT_COMMIT_HASH    ! CMake method for obtaining the git hash info
-#endif
-#ifdef GIT_HASH_FILE
-      ! vs-build method for obtaining the git hash info.
-      ! This requires setting:
-      !   1) GIT_HASH_FILE = '$(ProjectDir)\githash.txt' preprocessor option on this file.
-      !   2) Creating a pre-build event on the AFI project file which runs this command: ..\GetGitHash.bat
-      !   3) The bat file, GetGitHash.bat, located in the vs-build folder of the openfast repository, which has the git command: git describe --abbrev=8 --dirty --tags
-   git_commit  = ReadGitHash(GIT_HASH_FILE, errStat, errMsg)  
-#endif
 
-   print *, 'Running AFI_Driver version '//trim(git_commit)
+
+
+      ! Initialize the NWTC library 
+   call NWTC_Init()
+
+   print *, 'Running AFI_Driver version '
    
-      ! Parse the driver file if one was provided, if not, then set driver parameters using hardcoded values
+   
+      ! Parse the driver file if one was provided, if not, then set driver parameters using hardcoded values  
    if ( command_argument_count() > 1 ) then
       call print_help()
       stop
-   end if
-  
-   
-      ! Establish initialization inputs which are fixed for the stand-alone driver, but would be
-      ! variable for a coupled simulation
-   !nNodesPerBlade  = 1 
-   !numBlades       = 1
-   
-      ! Set up initialization data
-   !allocate(AFIndx(InitInData%nNodesPerBlade,InitInData%numBlades), STAT = ErrStat)
-   !   if ( ErrStat /= 0 ) then
-   !      call SetErrStat( ErrID_Fatal, 'Error trying to allocate InitInData%AFIndx.', ErrStat, ErrMsg, 'UnsteadyAeroTest')  
-   !      call Cleanup()
-   !      stop       
-   !   end if
-   !
-   !allocate(InitInData%c(InitInData%nNodesPerBlade,InitInData%numBlades), STAT = ErrStat)
-   !   if ( ErrStat /= 0 ) then
-   !      call SetErrStat( ErrID_Fatal, 'Error trying to allocate InitInData%c.', ErrStat, ErrMsg, 'UnsteadyAeroTest')  
-   !      call Cleanup()
-   !      stop       
-   !   end if
-   
-      
-      ! Parse the driver input file and run the simulation based on that file
-      
-   if ( command_argument_count() == 1 ) then
+   else if ( command_argument_count() == 1 ) then
       
       !call get_command_argument(1, dvrFilename)
       !call ReadDriverInputFile( dvrFilename, dvrInitInp, errStat2, errMsg2 )
@@ -125,55 +93,25 @@ program AFI_Driver
       !   end if
     
    
-   else
-      
+   else ! No argument     
       !dvrInitInp%OutRootName  = '.\TestingUA_Driver'
-    
-      afNames(1)    = 'C:\Dev\OpenFAST\raf-test\openfast\build\reg_tests\glue-codes\fast\5MW_Baseline\Airfoils\DU21_A17a.dat'
-      
-      
-   end if
- 
-      ! All nodes/blades are using the same 2D airfoil
-  
-   
-   
-      ! Initialize the Airfoil Info Params
-   !call Init_AFI( NumAFfiles, afNames, .FALSE., .FALSE., AFI_Params, errStat2, errMsg2 )
-   !   call SetErrStat( errStat2, errMsg2, ErrStat, ErrMsg, RoutineName )
-   !   if ( ErrStat >= AbortErrLev ) then
-   !      call Cleanup()
-   !      stop
-   !   end if
-   InitInputs%NumAFfiles = NumAFfiles
-   allocate ( InitInputs%FileNames( InitInputs%NumAFfiles ), STAT=ErrStat )
-      if ( ErrStat /= 0 ) then
-         call SetErrStat( ErrID_Fatal, 'Error trying to allocate AFI_InitInputs%FileNames.', ErrStat, ErrMsg, RoutineName)  
-         print *, ErrMsg
-         stop       
+      InitInputs%NumAFfiles    = 1
+      allocate( InitInputs%FileNames(InitInputs%NumAFfiles), STAT = errStat)
+      if (errStat /= 0 ) then
+         call SetErrStat( ErrID_Fatal, 'Error trying to allocate InitInputs%FileNames', errStat, errMsg, routineName)  
+         stop !call NormStop()
       end if
-   
-   
-   do i=1,InitInputs%NumAFfiles
-      InitInputs%FileNames(i) = afNames(i) !InitInp%AF_File(i)
-   end do
-   
-      ! Set this to 1 to use the UA coefs
-   !AFI_InitInputs%UA_Model    = 1
-      ! This is the number of columns of coefs in the AOA table: Cl, Cd, Cm, for example, but doesn't include Alpha
-   !AFI_InitInputs%NumCoefs    = 3
-      !
-   InitInputs%InCol_Alfa  = 1
-   InitInputs%InCol_Cl    = 2
-   InitInputs%InCol_Cd    = 3  
-   InitInputs%InCol_Cm    = 0
+      
+      InitInputs%FileNames(1)    = '.\DU25_A17.dat'   
+            ! Establish Initialization input data based on hardcoded airfoil file data
+      InitInputs%DimMod        =  2  !  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
+      InitInputs%InCol_Alfa	 =  1  !  "The column of the coefficient tables that holds the angle of attack"	-
+      InitInputs%InCol_Cl	    =  2  !	"The column of the coefficient tables that holds the lift coefficient"	-
+      InitInputs%InCol_Cd	    =  3  !	"The column of the coefficient tables that holds the minimum pressure coefficient"	-
+      InitInputs%InCol_Cm	    =  4  !  "The column of the coefficient tables that holds the pitching-moment coefficient"	-
+      InitInputs%InCol_Cpmin	 =  0  ! 	"The column of the coefficient tables that holds the minimum pressure coefficient"	-
 
-   
-   InitInputs%InCol_Cpmin = 0
-   
-   !AFI_InitInputs%Flookup     = Flookup
-
-   
+   end if
    
       ! Call AFI_Init to read in and process the airfoil files.
       ! This includes creating the spline coefficients to be used for interpolation.
@@ -182,11 +120,71 @@ program AFI_Driver
       call SetErrStat(errStat2, errMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) then
          print *, ErrMsg
-         
+         call NormStop()
       end if 
    
    
-  
+      ! Let's verify that for each angle in the airfoil file, we get the recorded values of Cl, Cd, and Cm
+   !do i = 1, p%AFInfo(1)%Table(1)%NumAlf 
+   !   angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+   !   angleDeg = angleRad*R2D
+   !   call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+   !   write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+   !end do
+   
+      ! Now let's force the code to interpolate between some values
+      ! We will print values that are in the table before and after the requested angle 
+      ! so we can see if the interpolation is reasonable
+   tableIndx = (/5, 27, 47, 67, 103/)
+   do j = 1, 5
+      do i = tableIndx(j)-1, tableIndx(j)
+         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleDeg = angleRad*R2D
+         call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      end do
+      
+      angleRad = 0.5_ReKi*(p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)+1) + p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)))
+      angleDeg = angleRad*R2D
+      call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+      write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      
+      do i = tableIndx(j)+1, tableIndx(j)+2
+         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleDeg = angleRad*R2D
+         call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      end do
+      
+   end do
+   
+   
+      ! Now let's force the code to interpolate between some values
+      ! We will print values that are in the table before and after the requested angle 
+      ! so we can see if the interpolation is reasonable
+   tableIndx = (/5, 27, 47, 67, 103/)
+   ReVal = 0.5_ReKi*(p%AFInfo(1)%Table(2)%Re + p%AFInfo(1)%Table(3)%Re)
+   do j = 1, 5
+      do i = tableIndx(j)-1, tableIndx(j)
+         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleDeg = angleRad*R2D
+         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      end do
+      
+      angleRad = 0.5_ReKi*(p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)+1) + p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)))
+      angleDeg = angleRad*R2D
+      call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+      write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      
+      do i = tableIndx(j)+1, tableIndx(j)+2
+         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleDeg = angleRad*R2D
+         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
+      end do
+      
+   end do
    
    !-------------------------------------------------------------------------------------------------
    ! Close our output file
@@ -195,53 +193,7 @@ program AFI_Driver
 
    call NormStop()
    
-   contains
-   
-   function ReadGitHash(fileName, ErrStat, ErrMsg)
-      ! Passed variables
-      integer(IntKi),     intent(out)     :: ErrStat                             ! Error status
-
-      character(*),       intent(in)      :: fileName                           ! Name of the file containing the primary input data
-      character(*),       intent(out)     :: ErrMsg                              ! Error message
-      character(200) :: ReadGitHash
-         ! Local variables:
-      real(ReKi)                    :: TmpAry(3)                                 ! array to help read tower properties table
-      integer(IntKi)                :: I                                         ! loop counter
-      integer(IntKi)                :: UnIn                                      ! Unit number for reading file
-     
-      integer(IntKi)                :: ErrStat2, IOS                             ! Temporary Error status
-      logical                       :: Echo                                      ! Determines if an echo file should be written
-      character(ErrMsgLen)          :: ErrMsg2                                   ! Temporary Error message
-      character(1024)               :: PriPath                                   ! Path name of the primary file
-      character(1024)               :: FTitle                                    ! "File Title": the 2nd line of the input file, which contains a description of its contents
-      character(200)                :: Line                                      ! Temporary storage of a line from the input file (to compare with "default")
-      character(*), parameter       :: RoutineName = 'ReadGitHash'
-   
-      ErrStat = ErrID_None
-      ErrMsg  = ''
-      ReadGitHash = ''
-      ! Get an available unit number for the file.
-
-      CALL GetNewUnit( UnIn, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-         ! Open the Primary input file.
-
-      CALL OpenFInpFile ( UnIn, fileName, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-        
-         
-      CALL ReadVar( UnIn, fileName, ReadGitHash, "HASH", "Git Hash String)", ErrStat2, ErrMsg2, 0)
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         
-      IF (UnIn > 0) CLOSE ( UnIn )
-      
-   end function ReadGitHash
-   
-   
-
-   
-   
+   contains 
    
    subroutine print_help()
     print '(a)', 'usage: '
@@ -252,6 +204,7 @@ program AFI_Driver
     print '(a)', ''
 
    end subroutine print_help
-   
+
+
 end program AFI_Driver
 
