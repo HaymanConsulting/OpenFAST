@@ -51,7 +51,7 @@ MODULE AirfoilInfo
    ! SUBROUTINE BEMT_GenSplines   ( FileNum, Re, Ctrl, InitInput, ErrStatLcl, ErrMsg )                                ! Phase #2: For BEM, generate splines for Cl and Cd at specific Re/Ctrl setting.
    ! SUBROUTINE BEMT_GetClCd      ( FileNum, AoA, Re, Ctrl, InitInput, Cl, Cd, ErrStatLcl, ErrMsg )                   ! Phase #3: For BEM, compute Cl and Cd for the given AoA.
    ! SUBROUTINE GetAllCoefs      ( FileNum, AoA, Re, Ctrl, InitInput, Cl, Cd, Cm, Cpmin, ErrStatLcl, ErrMsg )        ! Phase #4: Compute all requested airfoil coefficients for the given AoA.
-   ! SUBROUTINE ReadAFfile       ( AFInfo, NumCoefs, Col_Cm, Col_Cpmin, ErrStat, ErrMsg )             ! Read an airfoil file.
+   ! SUBROUTINE ReadAFfile       ( p, NumCoefs, Col_Cm, Col_Cpmin, ErrStat, ErrMsg )             ! Read an airfoil file.
 
    function CheckValuesAreUniqueMonotonicIncreasing(secondVals)
      
@@ -146,27 +146,16 @@ MODULE AirfoilInfo
       NumCoefs = MAX(p%ColCd, p%ColCm,p%ColCpmin) ! number of non-zero coefficient columns
       
               
-         ! Process the airfoil files.
+         ! Process the airfoil file.
       
-      ALLOCATE ( p%AFInfo( InitInput%NumAFfiles ), STAT=ErrStat2 )
-      IF ( ErrStat2 /= 0 )  THEN
-         CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the p%AFInfo array.', ErrStat, ErrMsg, RoutineName )
-         RETURN
-      ENDIF
-
-      p%AFInfo( :)%ColCpmin=p%ColCpmin
-      p%AFInfo( :)%ColCm=p%ColCm
-    
-
-      DO File=1,InitInput%NumAFfiles
 
          IF ( UnEc > 0 )  THEN
-            WRITE (UnEc,'("--",/,A)')  'Contents of "'//TRIM( InitInput%FileNames(File) )//'":'
+            WRITE (UnEc,'("--",/,A)')  'Contents of "'//TRIM( InitInput%FileName )//'":'
          END IF
          
 
-         CALL ReadAFfile ( InitInput%FileNames(File), NumCoefs, InitInput%InCol_Alfa &
-                         , InitInput%InCol_Cl, InitInput%InCol_Cd, InitInput%InCol_Cm, InitInput%InCol_Cpmin, p%AFInfo(File) &
+         CALL ReadAFfile ( InitInput%FileName, NumCoefs, InitInput%InCol_Alfa &
+                         , InitInput%InCol_Cl, InitInput%InCol_Cd, InitInput%InCol_Cm, InitInput%InCol_Cpmin, p &
                          , ErrStat2, ErrMsg2, UnEc ) 
             CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF ( ErrStat >= AbortErrLev )  THEN
@@ -176,41 +165,41 @@ MODULE AirfoilInfo
 
             ! Make sure that all the tables meet the current restrictions.
          
-         IF ( p%AFInfo(File)%NumTabs > 1 )  THEN
+         IF ( p%NumTabs > 1 )  THEN
 
             IF ( p%AFTabMod == 2 .or. p%AFTabMod == 3 ) THEN
                
-               ALLOCATE(secondVals(p%AFInfo(File)%NumTabs), STAT=ErrStat2 )
+               ALLOCATE(secondVals(p%NumTabs), STAT=ErrStat2 )
                   IF ( ErrStat2 /= 0 )  THEN
-                     CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the p%AFInfo array.', ErrStat, ErrMsg, RoutineName )
+                     CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the secondVals array.', ErrStat, ErrMsg, RoutineName )
                      RETURN
                   ENDIF
                IF (p%AFTabMod == 2) THEN
                      
               
-                     secondVals(1) = p%AFInfo(File)%Table(1)%Re
+                     secondVals(1) = p%Table(1)%Re
                      
                   ELSE IF (p%AFTabMod == 3) THEN
                      
                
-                     secondVals(1) = p%AFInfo(File)%Table(1)%UserProp
+                     secondVals(1) = p%Table(1)%UserProp
                      
                   END IF   
                ! Do the tables have the same number and set of alphas.
 
-               DO Table=2,p%AFInfo(File)%NumTabs
+               DO Table=2,p%NumTabs
 
-                  IF ( p%AFInfo(File)%Table(Table)%NumAlf /= p%AFInfo(File)%Table(1)%NumAlf )  THEN
-                     CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                  IF ( p%Table(Table)%NumAlf /= p%Table(1)%NumAlf )  THEN
+                     CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileName ) &
                                        //'", Table #'//TRIM( Num2LStr( Table ) ) &
                                        //' does not have the same number of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
                      CALL Cleanup()
                      RETURN
                   ENDIF
 
-                  DO IA=1,p%AFInfo(File)%Table(1)%NumAlf
-                     IF ( p%AFInfo(File)%Table(Table)%Alpha(IA) /= p%AFInfo(File)%Table(1)%Alpha(IA) )  THEN
-                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                  DO IA=1,p%Table(1)%NumAlf
+                     IF ( p%Table(Table)%Alpha(IA) /= p%Table(1)%Alpha(IA) )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: Airfoil file "'//TRIM( InitInput%FileName ) &
                                        //'", Table #'//TRIM( Num2LStr( Table ) ) &
                                        //' does not have the same set of alphas as the first table.', ErrStat, ErrMsg, RoutineName )
                         CALL Cleanup()
@@ -221,26 +210,26 @@ MODULE AirfoilInfo
                   IF (p%AFTabMod == 2) THEN
                      
                         ! Ctrl Value must be the same, Re must be monotonic increasing without repeats
-                     IF ( p%AFInfo(File)%Table(Table)%UserProp /= p%AFInfo(File)%Table(1)%UserProp )  THEN
-                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                     IF ( p%Table(Table)%UserProp /= p%Table(1)%UserProp )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileName ) &
                                        //'", Table #'//TRIM( Num2LStr( Table ) ) &
                                        //' does not have the same value for Ctrl Property (CtrlProp) as the first table.', ErrStat, ErrMsg, RoutineName )
                         CALL Cleanup()
                         RETURN
                      ENDIF
-                     secondVals(Table) = p%AFInfo(File)%Table(Table)%Re
+                     secondVals(Table) = p%Table(Table)%Re
                      
                   ELSE IF (p%AFTabMod == 3) THEN
                      
                         ! Re must be the same, Ctrl must be different
-                     IF ( p%AFInfo(File)%Table(Table)%Re /= p%AFInfo(File)%Table(1)%Re )  THEN
-                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                     IF ( p%Table(Table)%Re /= p%Table(1)%Re )  THEN
+                        CALL SetErrStat ( ErrID_Fatal, 'Fatal Error: airfoil file "'//TRIM( InitInput%FileName ) &
                                        //'", Table #'//TRIM( Num2LStr( Table ) ) &
                                        //' does not have the same value for Re Property (ReProp) as the first table.', ErrStat, ErrMsg, RoutineName )
                         CALL Cleanup()
                         RETURN
                      ENDIF
-                     secondVals(Table) = p%AFInfo(File)%Table(Table)%UserProp
+                     secondVals(Table) = p%Table(Table)%UserProp
                      
                   END IF
                   
@@ -250,7 +239,7 @@ MODULE AirfoilInfo
                IF (p%AFTabMod > 1) THEN
                   
                   IF (.NOT. CheckValuesAreUniqueMonotonicIncreasing(secondVals)) THEN
-                     ErrMsg2 = 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+                     ErrMsg2 = 'Fatal Error: airfoil file "'//TRIM( InitInput%FileName ) &
                                  //'", is not monotonic and increasing in the '
                      IF (p%AFTabMod == 2) THEN
                         ErrMsg2 = trim(ErrMsg2)//' Re Property (ReProp).'
@@ -266,19 +255,19 @@ MODULE AirfoilInfo
                END IF
                 
             ELSE
-               p%AFInfo(File)%NumTabs = 1
-               CALL SetErrStat ( ErrID_Warn, 'DimModel = 1D, therefore only using the first airfoil table in the file: "'//TRIM( InitInput%FileNames(File) ), ErrStat, ErrMsg, RoutineName )
+               p%NumTabs = 1
+               CALL SetErrStat ( ErrID_Warn, 'DimModel = 1D, therefore only using the first airfoil table in the file: "'//TRIM( InitInput%FileName ), ErrStat, ErrMsg, RoutineName )
             END IF
             
-         ENDIF ! ( p%AFInfo(File)%NumTabs > 1 )
+         ENDIF ! ( p%NumTabs > 1 )
 
 ! We need to deal with constant data.
 
 
-         do iTable = 1, p%AFInfo(File)%NumTabs
+         do iTable = 1, p%NumTabs
                ! Allocate the arrays to hold spline coefficients.
 
-            allocate ( p%AFInfo(File)%Table(iTable)%SplineCoefs( p%AFInfo(File)%Table(iTable)%NumAlf-1 &
+            allocate ( p%Table(iTable)%SplineCoefs( p%Table(iTable)%NumAlf-1 &
                      , NumCoefs, 0:3 ), STAT=ErrStat2 )
             if ( ErrStat2 /= 0 )  then
                call SetErrStat ( ErrStat2, 'Error allocating memory for the SplineCoefs array.', ErrStat, ErrMsg, RoutineName )
@@ -293,32 +282,32 @@ MODULE AirfoilInfo
 
             
             
-            if ( p%AFInfo(File)%InterpOrd == 3_IntKi ) then
+            if ( p%InterpOrd == 3_IntKi ) then
                
                ! bjj: what happens at the end points (these are periodic, so we should maybe extend the tables to make sure the end point?) 
 
                   ! use this for cubic splines:
-               call CubicSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
-                                     , p%AFInfo(File)%Table(iTable)%Coefs &
-                                     , p%AFInfo(File)%Table(iTable)%SplineCoefs &
+               call CubicSplineInitM ( p%Table(iTable)%Alpha &
+                                     , p%Table(iTable)%Coefs &
+                                     , p%Table(iTable)%SplineCoefs &
                                      , ErrStat2, ErrMsg2 )
                call SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                            
-            else if ( p%AFInfo(File)%InterpOrd == 1_IntKi ) then
+            else if ( p%InterpOrd == 1_IntKi ) then
                
                   ! use this for linear interpolation (sets the higher order coeffs to zero):
                
                   ! This is not the greatest way to get linear interpolation, but then we can use the same cubic spline routine
                   ! later without checking interp order there
-               call CubicLinSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
-                                     , p%AFInfo(File)%Table(iTable)%Coefs &
-                                     , p%AFInfo(File)%Table(iTable)%SplineCoefs &
+               call CubicLinSplineInitM ( p%Table(iTable)%Alpha &
+                                     , p%Table(iTable)%Coefs &
+                                     , p%Table(iTable)%SplineCoefs &
                                      , ErrStat2, ErrMsg2 )
                call SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                
             else
                
-               call SetErrStat ( ErrID_FATAL, 'Airfoil file "'//trim( InitInput%FileNames(File) ) &
+               call SetErrStat ( ErrID_FATAL, 'Airfoil file "'//trim( InitInput%FileName ) &
                                          //'": InterpOrd must be 1 (linear) or 3 (cubic spline).', ErrStat, ErrMsg, RoutineName )
                call Cleanup()
                return
@@ -334,7 +323,7 @@ MODULE AirfoilInfo
          DO Co=1,NumCoefs
             
                   ! We use 1D cubic spline interpolation if the data are not constant.
-               IF ( p%AFInfo(File)%Table(1)%ConstData )  THEN
+               IF ( p%Table(1)%ConstData )  THEN
 
                      ! We need to deal with constant data.
 
@@ -342,11 +331,10 @@ MODULE AirfoilInfo
                   CALL Cleanup()
                   RETURN
 
-               ENDIF ! p%AFInfo(File)%Table(1)%ConstData
+               ENDIF ! p%Table(1)%ConstData
 
          END DO ! Co
 
-      END DO ! File
 
       CALL Cleanup ( )
 
@@ -370,7 +358,7 @@ MODULE AirfoilInfo
     
       
    !=============================================================================
-   SUBROUTINE ReadAFfile ( AFfile, NumCoefs, InCol_Alfa, InCol_Cl, InCol_Cd, InCol_Cm, InCol_Cpmin, AFInfo &
+   SUBROUTINE ReadAFfile ( AFfile, NumCoefs, InCol_Alfa, InCol_Cl, InCol_Cd, InCol_Cm, InCol_Cpmin, p &
                          , ErrStat, ErrMsg, UnEc )
 
 
@@ -392,7 +380,7 @@ MODULE AirfoilInfo
       CHARACTER(*),      INTENT(IN)           :: AFfile                        ! The file to read in.
       CHARACTER(*),      INTENT(  OUT)        :: ErrMsg                        ! Error message.
 
-      TYPE (AFInfoType), INTENT(INOUT)        :: AFInfo                        ! The derived type for holding the constant parameters for this airfoil.
+      TYPE (AFI_ParameterType), INTENT(  OUT)   :: p                          ! This structure stores all the module parameters that are set by AirfoilInfo during the initialization phase.
 
 
          ! Local declarations.
@@ -443,50 +431,50 @@ MODULE AirfoilInfo
    DefaultInterpOrd = 3      
 #endif
       
-      CALL ParseVarWDefault ( FileInfo, CurLine, 'InterpOrd', AFInfo%InterpOrd, DefaultInterpOrd, ErrStat2, ErrMsg2, UnEc )
+      CALL ParseVarWDefault ( FileInfo, CurLine, 'InterpOrd', p%InterpOrd, DefaultInterpOrd, ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
          
          ! NonDimArea is currently unused by AirfoilInfo or codes using AirfoilInfo.  GJH 9/13/2017
-      CALL ParseVar ( FileInfo, CurLine, 'NonDimArea', AFInfo%NonDimArea, ErrStat2, ErrMsg2, UnEc )
+      CALL ParseVar ( FileInfo, CurLine, 'NonDimArea', p%NonDimArea, ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          
          ! NumCoords, with the Coords data, is used for determining the blade shape (currently used 
          !   for visualization only).  This data (blade coordinates) is passed to the caller via 
-         !   the InitOut%BladeShape data structure, and stored in p%AFInfo()%XCoord, etc.,
+         !   the InitOut%BladeShape data structure, and stored in p%XCoord, etc.,
          !   but is currently unused by AFI module.  GJH 9/13/2017
-      CALL ParseVar ( FileInfo, CurLine, 'NumCoords' , AFInfo%NumCoords , ErrStat2, ErrMsg2, UnEc )
+      CALL ParseVar ( FileInfo, CurLine, 'NumCoords' , p%NumCoords , ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          IF (ErrStat >= AbortErrLev) THEN
             CALL Cleanup()
             RETURN
          END IF
 
-      IF ( AFInfo%NumCoords > 0 )  THEN
+      IF ( p%NumCoords > 0 )  THEN
 
-         ALLOCATE ( AFInfo%X_Coord( AFInfo%NumCoords ) , STAT=ErrStat2 )
+         ALLOCATE ( p%X_Coord( p%NumCoords ) , STAT=ErrStat2 )
          IF ( ErrStat2 /= 0 )  THEN
-            CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for AFInfo%X_Coord.', ErrStat, ErrMsg, RoutineName )
+            CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for p%X_Coord.', ErrStat, ErrMsg, RoutineName )
             CALL Cleanup()
             RETURN
          ENDIF
 
-         ALLOCATE ( AFInfo%Y_Coord( AFInfo%NumCoords ) , STAT=ErrStat2 )
+         ALLOCATE ( p%Y_Coord( p%NumCoords ) , STAT=ErrStat2 )
          IF ( ErrStat2 /= 0 )  THEN
-            CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for AFInfo%Y_Coord.', ErrStat, ErrMsg, RoutineName )
+            CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for p%Y_Coord.', ErrStat, ErrMsg, RoutineName )
             CALL Cleanup()
             RETURN
          ENDIF
 
-         DO Row=1,AFInfo%NumCoords
+         DO Row=1,p%NumCoords
             CALL ParseAry ( FileInfo, CurLine, 'X_Coord/Y_Coord', Coords, 2, ErrStat2, ErrMsg2, UnEc )
                CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                IF (ErrStat >= AbortErrLev) THEN
                   CALL Cleanup()
                   RETURN
                END IF
-            AFInfo%X_Coord(Row) = Coords(1)
-            AFInfo%Y_Coord(Row) = Coords(2)
+            p%X_Coord(Row) = Coords(1)
+            p%Y_Coord(Row) = Coords(2)
          ENDDO ! Row
 
       ENDIF
@@ -505,160 +493,160 @@ MODULE AirfoilInfo
 
          ! Work through the multiple tables.
 
-      CALL ParseVar ( FileInfo, CurLine, 'NumTabs' , AFInfo%NumTabs , ErrStat2, ErrMsg2, UnEc )
+      CALL ParseVar ( FileInfo, CurLine, 'NumTabs' , p%NumTabs , ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          IF (ErrStat >= AbortErrLev) THEN
             CALL Cleanup()
             RETURN
          END IF
 
-      IF ( AFInfo%NumTabs < 1 )  THEN
+      IF ( p%NumTabs < 1 )  THEN
          CALL SetErrStat ( ErrID_Fatal, 'NumTabs must be > 0.', ErrStat, ErrMsg, RoutineName )
          CALL Cleanup()
          RETURN
       ENDIF
 
-      ALLOCATE ( AFInfo%Table( AFInfo%NumTabs ) , STAT=ErrStat2 )
+      ALLOCATE ( p%Table( p%NumTabs ) , STAT=ErrStat2 )
       IF ( ErrStat2 /= 0 )  THEN
-         CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for AFInfo%Table.', ErrStat, ErrMsg, RoutineName )
+         CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for p%Table.', ErrStat, ErrMsg, RoutineName )
          CALL Cleanup()
          RETURN
       ENDIF
 
-      DO Table=1,AFInfo%NumTabs
+      DO Table=1,p%NumTabs
 
-         CALL ParseVar ( FileInfo, CurLine, 'Re', AFInfo%Table(Table)%Re, ErrStat2, ErrMsg2, UnEc )
+         CALL ParseVar ( FileInfo, CurLine, 'Re', p%Table(Table)%Re, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF (ErrStat >= AbortErrLev) THEN
                CALL Cleanup()
                RETURN
             END IF
-         IF ( AFInfo%Table(Table)%Re <= 0.0 )  THEN
+         IF ( p%Table(Table)%Re <= 0.0 )  THEN
                CALL SetErrStat ( ErrID_Severe, 'Re must be > 0 in "'//TRIM( AFfile ) &
                                       //'".'//NewLine//'  >> The error occurred on line #' &
                                       //TRIM( Num2LStr( FileInfo%FileLine(CurLine-1) ) )//'.', ErrStat, ErrMsg, RoutineName )
                CALL Cleanup()
                RETURN
-         ENDIF ! ( AFInfo%Table(Table)%Re <= 0.0 )
+         ENDIF ! ( p%Table(Table)%Re <= 0.0 )
 
-         CALL ParseVar ( FileInfo, CurLine, 'Ctrl', AFInfo%Table(Table)%UserProp, ErrStat2, ErrMsg2, UnEc )
+         CALL ParseVar ( FileInfo, CurLine, 'Ctrl', p%Table(Table)%UserProp, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF (ErrStat >= AbortErrLev) THEN
                CALL Cleanup()
                RETURN
             END IF
-         !IF ( AFInfo%Table(Table)%UserProp /= 0.0 )  THEN !bjj: use EqualRealNos?
+         !IF ( p%Table(Table)%UserProp /= 0.0 )  THEN !bjj: use EqualRealNos?
          !      CALL SetErrStat ( ErrID_Severe, 'UserProp must equal 0.0 in "'//TRIM( AFfile ) &
          !                              //'".'//NewLine//'  >> The error occurred on line #' &
          !                              //TRIM( Num2LStr( FileInfo%FileLine(CurLine-1) ) )//'.', ErrStat, ErrMsg, RoutineName )
          !      CALL Cleanup()
          !      RETURN
-         !ENDIF ! ( AFInfo%Table(Table)%UserProp <= 0.0 )
+         !ENDIF ! ( p%Table(Table)%UserProp <= 0.0 )
 
-         CALL ParseVar ( FileInfo, CurLine, 'InclUAdata', AFInfo%Table(Table)%InclUAdata, ErrStat2, ErrMsg2, UnEc )
+         CALL ParseVar ( FileInfo, CurLine, 'InclUAdata', p%Table(Table)%InclUAdata, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF (ErrStat >= AbortErrLev) THEN
                CALL Cleanup()
                RETURN
             END IF
 
-         IF ( AFInfo%Table(Table)%InclUAdata )  THEN
+         IF ( p%Table(Table)%InclUAdata )  THEN
 
-               CALL ParseVar ( FileInfo, CurLine, 'alpha0', AFInfo%Table(Table)%UA_BL%alpha0, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'alpha0', p%Table(Table)%UA_BL%alpha0, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'alpha1', AFInfo%Table(Table)%UA_BL%alpha1, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'alpha1', p%Table(Table)%UA_BL%alpha1, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'alpha2', AFInfo%Table(Table)%UA_BL%alpha2, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'alpha2', p%Table(Table)%UA_BL%alpha2, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'eta_e', AFInfo%Table(Table)%UA_BL%eta_e, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'eta_e', p%Table(Table)%UA_BL%eta_e, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'C_nalpha', AFInfo%Table(Table)%UA_BL%C_nalpha, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'C_nalpha', p%Table(Table)%UA_BL%C_nalpha, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_f0', AFInfo%Table(Table)%UA_BL%T_f0, 3.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_f0', p%Table(Table)%UA_BL%T_f0, 3.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_V0', AFInfo%Table(Table)%UA_BL%T_V0, 6.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_V0', p%Table(Table)%UA_BL%T_V0, 6.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_p', AFInfo%Table(Table)%UA_BL%T_p, 1.7_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_p', p%Table(Table)%UA_BL%T_p, 1.7_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_VL', AFInfo%Table(Table)%UA_BL%T_VL, 11.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'T_VL', p%Table(Table)%UA_BL%T_VL, 11.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'b1', AFInfo%Table(Table)%UA_BL%b1, .14_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'b1', p%Table(Table)%UA_BL%b1, .14_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'b2', AFInfo%Table(Table)%UA_BL%b2, .53_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'b2', p%Table(Table)%UA_BL%b2, .53_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'b5', AFInfo%Table(Table)%UA_BL%b5, 5.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'b5', p%Table(Table)%UA_BL%b5, 5.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'A1', AFInfo%Table(Table)%UA_BL%A1, .3_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'A1', p%Table(Table)%UA_BL%A1, .3_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'A2', AFInfo%Table(Table)%UA_BL%A2, .7_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'A2', p%Table(Table)%UA_BL%A2, .7_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'A5', AFInfo%Table(Table)%UA_BL%A5, 1.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'A5', p%Table(Table)%UA_BL%A5, 1.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'S1', AFInfo%Table(Table)%UA_BL%S1, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'S1', p%Table(Table)%UA_BL%S1, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'S2', AFInfo%Table(Table)%UA_BL%S2, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'S2', p%Table(Table)%UA_BL%S2, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'S3', AFInfo%Table(Table)%UA_BL%S3, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'S3', p%Table(Table)%UA_BL%S3, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'S4', AFInfo%Table(Table)%UA_BL%S4, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'S4', p%Table(Table)%UA_BL%S4, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'Cn1', AFInfo%Table(Table)%UA_BL%Cn1, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'Cn1', p%Table(Table)%UA_BL%Cn1, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'Cn2', AFInfo%Table(Table)%UA_BL%Cn2, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'Cn2', p%Table(Table)%UA_BL%Cn2, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'St_sh', AFInfo%Table(Table)%UA_BL%St_sh, .19_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'St_sh', p%Table(Table)%UA_BL%St_sh, .19_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'Cd0', AFInfo%Table(Table)%UA_BL%Cd0, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'Cd0', p%Table(Table)%UA_BL%Cd0, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'Cm0', AFInfo%Table(Table)%UA_BL%Cm0, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'Cm0', p%Table(Table)%UA_BL%Cm0, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'k0', AFInfo%Table(Table)%UA_BL%k0, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'k0', p%Table(Table)%UA_BL%k0, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'k1', AFInfo%Table(Table)%UA_BL%k1, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'k1', p%Table(Table)%UA_BL%k1, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'k2', AFInfo%Table(Table)%UA_BL%k2, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'k2', p%Table(Table)%UA_BL%k2, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'k3', AFInfo%Table(Table)%UA_BL%k3, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'k3', p%Table(Table)%UA_BL%k3, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVar ( FileInfo, CurLine, 'k1_hat', AFInfo%Table(Table)%UA_BL%k1_hat, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVar ( FileInfo, CurLine, 'k1_hat', p%Table(Table)%UA_BL%k1_hat, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'x_cp_bar', AFInfo%Table(Table)%UA_BL%x_cp_bar, .2_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'x_cp_bar', p%Table(Table)%UA_BL%x_cp_bar, .2_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                   
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'UACutout', AFInfo%Table(Table)%UA_BL%UACutout, 45.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'UACutout', p%Table(Table)%UA_BL%UACutout, 45.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-               AFInfo%Table(Table)%UA_BL%UACutout = AFInfo%Table(Table)%UA_BL%UACutout*D2R
+               p%Table(Table)%UA_BL%UACutout = p%Table(Table)%UA_BL%UACutout*D2R
 
-               CALL ParseVarWDefault ( FileInfo, CurLine, 'filtCutOff', AFInfo%Table(Table)%UA_BL%filtCutOff, 20.0_ReKi, ErrStat2, ErrMsg2, UnEc )
+               CALL ParseVarWDefault ( FileInfo, CurLine, 'filtCutOff', p%Table(Table)%UA_BL%filtCutOff, 20.0_ReKi, ErrStat2, ErrMsg2, UnEc )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                   
                IF (ErrStat >= AbortErrLev) THEN
@@ -674,44 +662,44 @@ MODULE AirfoilInfo
             !CALL Cleanup()
             !RETURN
 
-         ENDIF ! ( AFInfo%Table(Table)%InclUAdata )
+         ENDIF ! ( p%Table(Table)%InclUAdata )
 
-         CALL ParseVar ( FileInfo, CurLine, 'NumAlf', AFInfo%Table(Table)%NumAlf, ErrStat2, ErrMsg2, UnEc )
+         CALL ParseVar ( FileInfo, CurLine, 'NumAlf', p%Table(Table)%NumAlf, ErrStat2, ErrMsg2, UnEc )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             IF (ErrStat >= AbortErrLev) THEN
                CALL Cleanup()
                RETURN
             END IF
 
-         IF ( AFInfo%Table(Table)%NumAlf < 1 )  THEN
+         IF ( p%Table(Table)%NumAlf < 1 )  THEN
             CALL SetErrStat( ErrID_Fatal, 'NumAlf must be a positive number on line #' &
                            //TRIM( Num2LStr( FileInfo%FileLine(CurLine-1) ) )//' in "'//TRIM( AFfile )//'".', ErrStat, ErrMsg, RoutineName )
             CALL Cleanup()
             RETURN
-         ELSEIF ( AFInfo%Table(Table)%NumAlf < 3 )  THEN
-            AFInfo%Table(Table)%ConstData = .TRUE.
+         ELSEIF ( p%Table(Table)%NumAlf < 3 )  THEN
+            p%Table(Table)%ConstData = .TRUE.
          ELSE
-            AFInfo%Table(Table)%ConstData = .FALSE.
+            p%Table(Table)%ConstData = .FALSE.
          ENDIF ! ( Test for valid values for NumAlf )
 
 
             ! Allocate the arrays for the airfoil coefficients.
 
-         ALLOCATE ( AFInfo%Table(Table)%Alpha( AFInfo%Table(Table)%NumAlf ), STAT=ErrStat2 )
+         ALLOCATE ( p%Table(Table)%Alpha( p%Table(Table)%NumAlf ), STAT=ErrStat2 )
          IF ( ErrStat2 /= 0 )  THEN
-            CALL SetErrStat( ErrID_Fatal, 'Error allocating memory for AFInfo%Table%Alpha.', ErrStat, ErrMsg, RoutineName )
+            CALL SetErrStat( ErrID_Fatal, 'Error allocating memory for p%Table%Alpha.', ErrStat, ErrMsg, RoutineName )
             CALL Cleanup()
             RETURN
          ENDIF
 
-         ALLOCATE ( AFInfo%Table(Table)%Coefs( AFInfo%Table(Table)%NumAlf, NumCoefs ), STAT=ErrStat2 )
+         ALLOCATE ( p%Table(Table)%Coefs( p%Table(Table)%NumAlf, NumCoefs ), STAT=ErrStat2 )
          IF ( ErrStat2 /= 0 )  THEN
-            CALL SetErrStat( ErrID_Fatal, 'Error allocating memory for AFInfo%Table%Coefs.', ErrStat, ErrMsg, RoutineName )
+            CALL SetErrStat( ErrID_Fatal, 'Error allocating memory for p%Table%Coefs.', ErrStat, ErrMsg, RoutineName )
             CALL Cleanup()
             RETURN
          ENDIF
 
-         DO Row=1,AFInfo%Table(Table)%NumAlf
+         DO Row=1,p%Table(Table)%NumAlf
 
             CALL ParseAry ( FileInfo, CurLine, 'CoeffData', SiAry, Cols2Parse, ErrStat2, ErrMsg2, UnEc )
                CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -720,16 +708,16 @@ MODULE AirfoilInfo
                   RETURN
                END IF
 
-            AFInfo%Table(Table)%Alpha(Row  ) = SiAry(InCol_Alfa)*D2R
-           !AFInfo%Table(Table)%Alpha(Row  ) = SiAry(InCol_Alfa)
-            AFInfo%Table(Table)%Coefs(Row,1) = SiAry(InCol_Cl  )
-            AFInfo%Table(Table)%Coefs(Row,2) = SiAry(InCol_Cd  )
+            p%Table(Table)%Alpha(Row  ) = SiAry(InCol_Alfa)*D2R
+           !p%Table(Table)%Alpha(Row  ) = SiAry(InCol_Alfa)
+            p%Table(Table)%Coefs(Row,1) = SiAry(InCol_Cl  )
+            p%Table(Table)%Coefs(Row,2) = SiAry(InCol_Cd  )
 
             IF ( InCol_Cm > 0 )  THEN
-               AFInfo%Table(Table)%Coefs(Row,3) = SiAry(InCol_Cm)
-               IF ( InCol_Cpmin > 0 )  AFInfo%Table(Table)%Coefs(Row,4) = SiAry(InCol_Cpmin)
+               p%Table(Table)%Coefs(Row,3) = SiAry(InCol_Cm)
+               IF ( InCol_Cpmin > 0 )  p%Table(Table)%Coefs(Row,4) = SiAry(InCol_Cpmin)
             ELSE
-               IF ( InCol_Cpmin > 0 )  AFInfo%Table(Table)%Coefs(Row,3) = SiAry(InCol_Cpmin)
+               IF ( InCol_Cpmin > 0 )  p%Table(Table)%Coefs(Row,3) = SiAry(InCol_Cpmin)
             ENDIF ! IF ( Col_Cm > 0 )  THEN
 
          ENDDO ! Row
@@ -738,19 +726,19 @@ MODULE AirfoilInfo
             ! Let's make sure that the data go from -Pi to Pi and that the values are the same for both
             ! unless there is only one point.
 
-         IF ( .NOT. AFInfo%Table(Table)%ConstData )  THEN
-            NumAlf  = AFInfo%Table(Table)%NumAlf
+         IF ( .NOT. p%Table(Table)%ConstData )  THEN
+            NumAlf  = p%Table(Table)%NumAlf
             BadVals = .FALSE.
-            IF ( .NOT. EqualRealNos( AFInfo%Table(Table)%Alpha(1), -Pi ) )  THEN
-            !IF ( .NOT. EqualRealNos( AFInfo%Table(Table)%Alpha(1), -180.0_ReKi ) )  THEN
+            IF ( .NOT. EqualRealNos( p%Table(Table)%Alpha(1), -Pi ) )  THEN
+            !IF ( .NOT. EqualRealNos( p%Table(Table)%Alpha(1), -180.0_ReKi ) )  THEN
                BadVals = .TRUE.
             ENDIF
-            IF ( .NOT. EqualRealNos( AFInfo%Table(Table)%Alpha(NumAlf), Pi ) )  THEN
-            !IF ( .NOT. EqualRealNos( AFInfo%Table(Table)%Alpha(NumAlf), 180.0_ReKi ) )  THEN
+            IF ( .NOT. EqualRealNos( p%Table(Table)%Alpha(NumAlf), Pi ) )  THEN
+            !IF ( .NOT. EqualRealNos( p%Table(Table)%Alpha(NumAlf), 180.0_ReKi ) )  THEN
                BadVals = .TRUE.
             ENDIF
             DO Coef=1,NumCoefs
-               IF ( .NOT. EqualRealNos( AFInfo%Table(Table)%Coefs(1,Coef), AFInfo%Table(Table)%Coefs(NumAlf,Coef) ) )  THEN
+               IF ( .NOT. EqualRealNos( p%Table(Table)%Coefs(1,Coef), p%Table(Table)%Coefs(NumAlf,Coef) ) )  THEN
                   BadVals = .TRUE.
                ENDIF
             ENDDO ! Coef
@@ -760,7 +748,7 @@ MODULE AirfoilInfo
                CALL Cleanup()
                RETURN
             ENDIF
-         ENDIF ! ( .NOT. AFInfo%Table(Table)%ConstData )
+         ENDIF ! ( .NOT. p%Table(Table)%ConstData )
 
       ENDDO ! Table
 
@@ -786,20 +774,20 @@ MODULE AirfoilInfo
    END SUBROUTINE ReadAFfile
       
 !----------------------------------------------------------------------------------------------------------------------------------  
-subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo, &
+subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, p, &
                       Cl, Cd, Cm, Cpmin, errStat, errMsg )
 ! This routine is calculates Cl, Cd, Cm, (and Cpmin) for a set of tables which are dependent on AOA as well as a 2nd user-defined varible, could be Re or Cntrl, etc.
 ! If the requested yVar is not associated with a given table, then the two tables which contain yVar are found and, a cubic spline interpolation is performed at the requested AOA.
 ! for each of those two tables. Then a linear intepolation is performed on the 2nd dimension to find the final Cl,Cd,Cm, and Cpmin values.
 ! If the requested yVar corresponds to a table, then only a single cubic interpolation based on the requested AOA is performed.
 !..................................................................................................................................
-   integer(IntKi),         intent(in   ) :: interpolant
-   real(ReKi),             intent(in   ) :: AOA
-   real(ReKi),             intent(in   ) :: secondaryDepVal           ! Unused in the current version!     
-   type(AFInfoType),       intent(in   ) :: AFInfo
-   real(ReKi),             intent(  out) :: Cl, Cd, Cm, Cpmin
-   integer(IntKi),         intent(  out) :: errStat       ! Error status of the operation
-   character(*),           intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None 
+   integer(IntKi),           intent(in   ) :: interpolant
+   real(ReKi),               intent(in   ) :: AOA
+   real(ReKi),               intent(in   ) :: secondaryDepVal           ! Unused in the current version!     
+   TYPE (AFI_ParameterType), intent(in   ) :: p                          ! This structure stores all the module parameters that are set by AirfoilInfo during the initialization phase.
+   real(ReKi),               intent(  out) :: Cl, Cd, Cm, Cpmin
+   integer(IntKi),           intent(  out) :: errStat                    ! Error status of the operation
+   character(*),             intent(  out) :: errMsg                     ! Error message if ErrStat /= ErrID_None 
    
    
    real                            :: IntAFCoefs(4)                ! The interpolated airfoil coefficients.
@@ -814,13 +802,13 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
       ! check that we have tables which contain specified secondaryDepVal.  If not, throw error
    lowerTable = 0
    upperTable = 0
-   do i = 1, AFInfo%NumTabs
+   do i = 1, p%NumTabs
       if (interpolant == 1) then
-         if (AFInfo%Table(i)%Re <= secondaryDepVal) lowerTable = i
-         if (AFInfo%Table(i)%Re >= secondaryDepVal) upperTable = i
+         if (p%Table(i)%Re <= secondaryDepVal) lowerTable = i
+         if (p%Table(i)%Re >= secondaryDepVal) upperTable = i
       else
-         if (AFInfo%Table(i)%UserProp <= secondaryDepVal) lowerTable = i
-         if (AFInfo%Table(i)%UserProp >= secondaryDepVal) upperTable = i
+         if (p%Table(i)%UserProp <= secondaryDepVal) lowerTable = i
+         if (p%Table(i)%UserProp >= secondaryDepVal) upperTable = i
       end if
       
    end do
@@ -841,7 +829,7 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
       ! NOTE: we use Table(1) because the right now we can only interpolate with AOA and not Re or other variables.  If we had multiple tables stored
       ! for changes in other variables (Re, Mach #, etc) then then we would need to interpolate across tables.
       !
-   s1 = size(AFInfo%Table(lowerTable)%Coefs,2)
+   s1 = size(p%Table(lowerTable)%Coefs,2)
    
    Alpha = AOA
    call MPi2Pi ( Alpha ) ! change AOA into range of -pi to pi
@@ -850,9 +838,9 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
       ! Spline interpolation of lower table based on requested AOA
    
    IntAFCoefs(1:s1) = CubicSplineInterpM( Alpha  &
-                                          , AFInfo%Table(lowerTable)%Alpha &
-                                          , AFInfo%Table(lowerTable)%Coefs &
-                                          , AFInfo%Table(lowerTable)%SplineCoefs &
+                                          , p%Table(lowerTable)%Alpha &
+                                          , p%Table(lowerTable)%Coefs &
+                                          , p%Table(lowerTable)%SplineCoefs &
                                           , ErrStat, ErrMsg )
    
   
@@ -861,17 +849,17 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
    Cm1    = 0.0_Reki  !Set these to zero unless there is data to be read in
    Cpmin1 = 0.0_Reki
      
-   IF ( AFInfo%ColCm > 0 ) Cm1 = IntAFCoefs(AFInfo%ColCm)
+   IF ( p%ColCm > 0 ) Cm1 = IntAFCoefs(p%ColCm)
          
-   IF ( AFInfo%ColCpmin > 0 ) Cpmin1 = IntAFCoefs(AFInfo%ColCpmin)
+   IF ( p%ColCpmin > 0 ) Cpmin1 = IntAFCoefs(p%ColCpmin)
       
    
       ! Spline interpolation of upper table based on requested AOA
    
    IntAFCoefs(1:s1) = CubicSplineInterpM( Alpha  &
-                                          , AFInfo%Table(upperTable)%Alpha &
-                                          , AFInfo%Table(upperTable)%Coefs &
-                                          , AFInfo%Table(upperTable)%SplineCoefs &
+                                          , p%Table(upperTable)%Alpha &
+                                          , p%Table(upperTable)%Coefs &
+                                          , p%Table(upperTable)%SplineCoefs &
                                           , ErrStat, ErrMsg )
    
   
@@ -880,18 +868,18 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
    Cm2    = 0.0_Reki  !Set these to zero unless there is data to be read in
    Cpmin2 = 0.0_Reki
      
-   IF ( AFInfo%ColCm > 0 ) Cm2 = IntAFCoefs(AFInfo%ColCm)
+   IF ( p%ColCm > 0 ) Cm2 = IntAFCoefs(p%ColCm)
          
-   IF ( AFInfo%ColCpmin > 0 ) Cpmin2 = IntAFCoefs(AFInfo%ColCpmin)
+   IF ( p%ColCpmin > 0 ) Cpmin2 = IntAFCoefs(p%ColCpmin)
    
    
       ! Linearly interpolate between tables
    if (interpolant == 1) then
-      dVal = (AFInfo%Table(upperTable)%Re - AFInfo%Table(lowerTable)%Re)
-      lowerVal = AFInfo%Table(lowerTable)%Re
+      dVal = (p%Table(upperTable)%Re - p%Table(lowerTable)%Re)
+      lowerVal = p%Table(lowerTable)%Re
    else
-      dVal = (AFInfo%Table(upperTable)%UserProp - AFInfo%Table(lowerTable)%UserProp)
-      lowerVal = AFInfo%Table(lowerTable)%UserProp
+      dVal = (p%Table(upperTable)%UserProp - p%Table(lowerTable)%UserProp)
+      lowerVal = p%Table(lowerTable)%UserProp
    end if
    
    if (EqualRealNos(dVal, 0.0_ReKi)) then
@@ -908,18 +896,18 @@ subroutine AFI_ComputeAirfoilCoefs2D( interpolant, AOA, secondaryDepVal, AFInfo,
 end subroutine AFI_ComputeAirfoilCoefs2D  
          
 !----------------------------------------------------------------------------------------------------------------------------------  
-subroutine AFI_ComputeAirfoilCoefs1D( AOA, AFInfo, &
+subroutine AFI_ComputeAirfoilCoefs1D( AOA, p, &
                       Cl, Cd, Cm, Cpmin, errStat, errMsg )
 ! This routine is calculates Cl, Cd, Cm, (and Cpmin) for a set of tables which are dependent on AOA as well as a 2nd user-defined varible, could be Re or Cntrl, etc.
 ! If the requested yVar is not associated with a given table, then the two tables which contain yVar are found and, a cubic spline interpolation is performed at the requested AOA.
 ! for each of those two tables. Then a linear intepolation is performed on the 2nd dimension to find the final Cl,Cd,Cm, and Cpmin values.
 ! If the requested yVar corresponds to a table, then only a single cubic interpolation based on the requested AOA is performed.
 !..................................................................................................................................
-   real(ReKi),             intent(in   ) :: AOA 
-   type(AFInfoType),       intent(in   ) :: AFInfo
-   real(ReKi),             intent(  out) :: Cl, Cd, Cm, Cpmin
-   integer(IntKi),         intent(  out) :: errStat       ! Error status of the operation
-   character(*),           intent(  out) :: errMsg        ! Error message if ErrStat /= ErrID_None 
+   real(ReKi),               intent(in   ) :: AOA 
+   TYPE (AFI_ParameterType), intent(in   ) :: p                          ! This structure stores all the module parameters that are set by AirfoilInfo during the initialization phase.
+   real(ReKi),               intent(  out) :: Cl, Cd, Cm, Cpmin
+   integer(IntKi),           intent(  out) :: errStat                    ! Error status of the operation
+   character(*),             intent(  out) :: errMsg                     ! Error message if ErrStat /= ErrID_None 
    
    
    real                            :: IntAFCoefs(4)                ! The interpolated airfoil coefficients.
@@ -931,7 +919,7 @@ subroutine AFI_ComputeAirfoilCoefs1D( AOA, AFInfo, &
 
    IntAFCoefs = 0.0_ReKi ! initialize in case we only don't have 4 columns in the airfoil data (i.e., so cm is zero if not in the file)
  
-   s1 = size(AFInfo%Table(1)%Coefs,2)
+   s1 = size(p%Table(1)%Coefs,2)
    
    Alpha = AOA
    call MPi2Pi ( Alpha ) ! change AOA into range of -pi to pi
@@ -940,9 +928,9 @@ subroutine AFI_ComputeAirfoilCoefs1D( AOA, AFInfo, &
       ! Spline interpolation of lower table based on requested AOA
    
    IntAFCoefs(1:s1) = CubicSplineInterpM( Alpha  &
-                                          , AFInfo%Table(1)%Alpha &
-                                          , AFInfo%Table(1)%Coefs &
-                                          , AFInfo%Table(1)%SplineCoefs &
+                                          , p%Table(1)%Alpha &
+                                          , p%Table(1)%Coefs &
+                                          , p%Table(1)%SplineCoefs &
                                           , ErrStat, ErrMsg )
    
   
@@ -951,90 +939,90 @@ subroutine AFI_ComputeAirfoilCoefs1D( AOA, AFInfo, &
    Cm    = 0.0_Reki  !Set these to zero unless there is data to be read in
    Cpmin = 0.0_Reki
      
-   IF ( AFInfo%ColCm > 0 ) Cm = IntAFCoefs(AFInfo%ColCm)
+   IF ( p%ColCm > 0 ) Cm = IntAFCoefs(p%ColCm)
          
-   IF ( AFInfo%ColCpmin > 0 ) Cpmin = IntAFCoefs(AFInfo%ColCpmin)
+   IF ( p%ColCpmin > 0 ) Cpmin = IntAFCoefs(p%ColCpmin)
   
 end subroutine AFI_ComputeAirfoilCoefs1D                        
                       
-   subroutine AFI_GetAirfoilParams( AFInfo, M, Re, alpha0, alpha1, alpha2, eta_e, C_nalpha, C_nalpha_circ, T_f0, T_V0, T_p, T_VL, St_sh, &
+   subroutine AFI_GetAirfoilParams( p, M, Re, alpha0, alpha1, alpha2, eta_e, C_nalpha, C_nalpha_circ, T_f0, T_V0, T_p, T_VL, St_sh, &
                                     b1, b2, b5, A1, A2, A5, S1, S2, S3, S4, Cn1, Cn2, Cd0, Cm0, k0, k1, k2, k3, k1_hat, x_cp_bar, filtCutOff, errMsg, errStat )     
 
-   type(AFInfoType), intent(in   )       :: AFInfo                        ! The derived type for holding the constant parameters for this airfoil.
-   real(ReKi),       intent(in   )       :: M                             ! mach number
-   real(ReKi),       intent(in   )       :: Re                            ! Reynold's number
-   
-   real(ReKi),       intent(  out)       :: alpha0                        ! zero lift angle of attack (radians)
-   real(ReKi),       intent(  out)       :: alpha1                        ! angle of attack at f = 0.7, approximately the stall angle; for alpha >= alpha0 (radians)
-   real(ReKi),       intent(  out)       :: alpha2                        ! angle of attack at f = 0.7, approximately the stall angle; for alpha < alpha0 (radians)
-   real(ReKi),       intent(  out)       :: eta_e                         !
-   real(ReKi),       intent(  out)       :: C_nalpha                      !
-   real(ReKi),       intent(  out)       :: C_nalpha_circ                 ! slope of the circulatory normal force coefficient vs alpha curve
-   real(ReKi),       intent(  out)       :: T_f0                          ! initial value of T_f, airfoil specific, used to compute D_f and fprimeprime
-   real(ReKi),       intent(  out)       :: T_V0                          ! initial value of T_V, airfoil specific, time parameter associated with the vortex lift decay process, used in Cn_v
-   real(ReKi),       intent(  out)       :: T_p                           ! boundary-layer, leading edge pressure gradient time parameter; used in D_p; airfoil specific
-   real(ReKi),       intent(  out)       :: T_VL                          ! time variable associated with the vortex advection process; it represents the non-dimensional time in semi-chords needed for a vortex to travel from leading edge to trailing edge
-   real(ReKi),       intent(  out)       :: St_sh                         !
-   real(ReKi),       intent(  out)       :: b1                            ! airfoil constant derived from experimental results, usually 0.14
-   real(ReKi),       intent(  out)       :: b2                            ! airfoil constant derived from experimental results, usually 0.53
-   real(ReKi),       intent(  out)       :: b5                            ! airfoil constant derived from experimental results, usually 5.0
-   real(ReKi),       intent(  out)       :: A1                            ! airfoil constant derived from experimental results, usually 0.3 
-   real(ReKi),       intent(  out)       :: A2                            ! airfoil constant derived from experimental results, usually 0.7
-   real(ReKi),       intent(  out)       :: A5                            ! airfoil constant derived from experimental results, usually 1.0
-   real(ReKi),       intent(  out)       :: S1                            ! constant in the f-curve best-fit, alpha >= alpha0 
-   real(ReKi),       intent(  out)       :: S2                            ! constant in the f-curve best-fit, alpha >= alpha0 
-   real(ReKi),       intent(  out)       :: S3                            ! constant in the f-curve best-fit, alpha <  alpha0 
-   real(ReKi),       intent(  out)       :: S4                            ! constant in the f-curve best-fit, alpha <  alpha0 
-   real(ReKi),       intent(  out)       :: Cn1                           ! critical value of Cn_prime at LE separation for alpha >= alpha0
-   real(ReKi),       intent(  out)       :: Cn2                           ! critical value of Cn_prime at LE separation for alpha < alpha0
-   real(ReKi),       intent(  out)       :: Cd0                           !
-   real(ReKi),       intent(  out)       :: Cm0                           ! 2D pitching moment coefficient at zero lift, positive if nose is up
-   real(ReKi),       intent(  out)       :: k0                            ! airfoil parameter in the x_cp_hat curve best-fit
-   real(ReKi),       intent(  out)       :: k1                            ! airfoil parameter in the x_cp_hat curve best-fit
-   real(ReKi),       intent(  out)       :: k2                            ! airfoil parameter in the x_cp_hat curve best-fit
-   real(ReKi),       intent(  out)       :: k3                            ! airfoil parameter in the x_cp_hat curve best-fit
-   real(ReKi),       intent(  out)       :: k1_hat                        !
-   real(ReKi),       intent(  out)       :: x_cp_bar                      ! airfoil parameter for calulating x_cp_v
-   real(ReKi),       intent(  out)       :: filtCutOff                    ! airfoil parameter for the low-pass cut-off frequency for pitching rate and accelerations (Hz)
-   integer(IntKi),   intent(  out)       :: errStat                       ! Error status. 
-   character(*),     intent(  out)       :: errMsg                        ! Error message.
+   type(AFI_ParameterType), intent(in   ) :: p                          ! This structure stores all the module parameters that are set by AirfoilInfo during the initialization phase.
+   real(ReKi),              intent(in   ) :: M                             ! mach number
+   real(ReKi),              intent(in   ) :: Re                            ! Reynold's number
+                          
+   real(ReKi),              intent(  out) :: alpha0                        ! zero lift angle of attack (radians)
+   real(ReKi),              intent(  out) :: alpha1                        ! angle of attack at f = 0.7, approximately the stall angle; for alpha >= alpha0 (radians)
+   real(ReKi),              intent(  out) :: alpha2                        ! angle of attack at f = 0.7, approximately the stall angle; for alpha < alpha0 (radians)
+   real(ReKi),              intent(  out) :: eta_e                         !
+   real(ReKi),              intent(  out) :: C_nalpha                      !
+   real(ReKi),              intent(  out) :: C_nalpha_circ                 ! slope of the circulatory normal force coefficient vs alpha curve
+   real(ReKi),              intent(  out) :: T_f0                          ! initial value of T_f, airfoil specific, used to compute D_f and fprimeprime
+   real(ReKi),              intent(  out) :: T_V0                          ! initial value of T_V, airfoil specific, time parameter associated with the vortex lift decay process, used in Cn_v
+   real(ReKi),              intent(  out) :: T_p                           ! boundary-layer, leading edge pressure gradient time parameter; used in D_p; airfoil specific
+   real(ReKi),              intent(  out) :: T_VL                          ! time variable associated with the vortex advection process; it represents the non-dimensional time in semi-chords needed for a vortex to travel from leading edge to trailing edge
+   real(ReKi),              intent(  out) :: St_sh                         !
+   real(ReKi),              intent(  out) :: b1                            ! airfoil constant derived from experimental results, usually 0.14
+   real(ReKi),              intent(  out) :: b2                            ! airfoil constant derived from experimental results, usually 0.53
+   real(ReKi),              intent(  out) :: b5                            ! airfoil constant derived from experimental results, usually 5.0
+   real(ReKi),              intent(  out) :: A1                            ! airfoil constant derived from experimental results, usually 0.3 
+   real(ReKi),              intent(  out) :: A2                            ! airfoil constant derived from experimental results, usually 0.7
+   real(ReKi),              intent(  out) :: A5                            ! airfoil constant derived from experimental results, usually 1.0
+   real(ReKi),              intent(  out) :: S1                            ! constant in the f-curve best-fit, alpha >= alpha0 
+   real(ReKi),              intent(  out) :: S2                            ! constant in the f-curve best-fit, alpha >= alpha0 
+   real(ReKi),              intent(  out) :: S3                            ! constant in the f-curve best-fit, alpha <  alpha0 
+   real(ReKi),              intent(  out) :: S4                            ! constant in the f-curve best-fit, alpha <  alpha0 
+   real(ReKi),              intent(  out) :: Cn1                           ! critical value of Cn_prime at LE separation for alpha >= alpha0
+   real(ReKi),              intent(  out) :: Cn2                           ! critical value of Cn_prime at LE separation for alpha < alpha0
+   real(ReKi),              intent(  out) :: Cd0                           !
+   real(ReKi),              intent(  out) :: Cm0                           ! 2D pitching moment coefficient at zero lift, positive if nose is up
+   real(ReKi),              intent(  out) :: k0                            ! airfoil parameter in the x_cp_hat curve best-fit
+   real(ReKi),              intent(  out) :: k1                            ! airfoil parameter in the x_cp_hat curve best-fit
+   real(ReKi),              intent(  out) :: k2                            ! airfoil parameter in the x_cp_hat curve best-fit
+   real(ReKi),              intent(  out) :: k3                            ! airfoil parameter in the x_cp_hat curve best-fit
+   real(ReKi),              intent(  out) :: k1_hat                        !
+   real(ReKi),              intent(  out) :: x_cp_bar                      ! airfoil parameter for calulating x_cp_v
+   real(ReKi),              intent(  out) :: filtCutOff                    ! airfoil parameter for the low-pass cut-off frequency for pitching rate and accelerations (Hz)
+   integer(IntKi),          intent(  out) :: errStat                       ! Error status. 
+   character(*),            intent(  out) :: errMsg                        ! Error message.
       
       errMsg         = ''
       errStat        = ErrID_None
         
    
-      ! These coefs are stored in the AFInfo data structures based on Re
-   alpha0         =  AFInfo%Table(1)%UA_BL%alpha0   * D2R   ! Convert to radians
-   alpha1         =  AFInfo%Table(1)%UA_BL%alpha1   * D2R   ! Convert to radians
-   alpha2         =  AFInfo%Table(1)%UA_BL%alpha2   * D2R   ! Convert to radians
-   eta_e          =  AFInfo%Table(1)%UA_BL%eta_e         !0.90               ! Recovery factor in the range [0.85 - 0.95]
-   C_nalpha       =  AFInfo%Table(1)%UA_BL%C_nalpha      !2*pi  
-   T_f0           =  AFInfo%Table(1)%UA_BL%T_f0          !3.0_ReKi  ! seconds
-   T_V0           =  AFInfo%Table(1)%UA_BL%T_V0          !6.0_ReKi
-   T_p            =  AFInfo%Table(1)%UA_BL%T_p           !1.7_ReKi
-   T_VL           =  AFInfo%Table(1)%UA_BL%T_VL          !11.0_ReKi
-   b1             =  AFInfo%Table(1)%UA_BL%b1            !0.14_ReKi
-   b2             =  AFInfo%Table(1)%UA_BL%b2            !0.53_ReKi
-   b5             =  AFInfo%Table(1)%UA_BL%b5            !5.0_ReKi
-   A1             =  AFInfo%Table(1)%UA_BL%A1            !0.3_ReKi
-   A2             =  AFInfo%Table(1)%UA_BL%A2            !0.70_ReKi
-   A5             =  AFInfo%Table(1)%UA_BL%A5            !1.0_ReKi
-   S1             =  AFInfo%Table(1)%UA_BL%S1            !0.0262_ReKi   !!!!!!!!!!
-   S2             =  AFInfo%Table(1)%UA_BL%S2            !0.0201_ReKi   !!!!!!!!!!
-   S3             =  AFInfo%Table(1)%UA_BL%S3            !0.0262_ReKi   !!!!!!!!!!
-   S4             =  AFInfo%Table(1)%UA_BL%S4            !0.0201_ReKi   !!!!!!!!!!
-   Cn1            =  AFInfo%Table(1)%UA_BL%Cn1           !1.264_ReKi  ! Stall values of Cn
-   Cn2            =  AFInfo%Table(1)%UA_BL%Cn2           !-0.833_ReKi
-   St_sh          =  AFInfo%Table(1)%UA_BL%St_sh         !0.19_ReKi
-   Cd0            =  AFInfo%Table(1)%UA_BL%Cd0           !0.012_ReKi
-   Cm0            =  AFInfo%Table(1)%UA_BL%Cm0           !0.0_ReKi
-   k0             =  AFInfo%Table(1)%UA_BL%k0            !0.0_ReKi
-   k1             =  AFInfo%Table(1)%UA_BL%k1            !0.0_ReKi
-   k2             =  AFInfo%Table(1)%UA_BL%k2            !0.0_ReKi
-   k3             =  AFInfo%Table(1)%UA_BL%k3            !0.0_ReKi
-   k1_hat         =  AFInfo%Table(1)%UA_BL%k1_hat        !0.0_ReKi
-   x_cp_bar       =  AFInfo%Table(1)%UA_BL%x_cp_bar      !0.2_ReKi
-   filtCutOff     =  AFInfo%Table(1)%UA_BL%filtCutOff    ! 5.0_ReKi  Hz
+      ! These coefs are stored in the p data structures based on Re
+   alpha0         =  p%Table(1)%UA_BL%alpha0   * D2R   ! Convert to radians
+   alpha1         =  p%Table(1)%UA_BL%alpha1   * D2R   ! Convert to radians
+   alpha2         =  p%Table(1)%UA_BL%alpha2   * D2R   ! Convert to radians
+   eta_e          =  p%Table(1)%UA_BL%eta_e         !0.90               ! Recovery factor in the range [0.85 - 0.95]
+   C_nalpha       =  p%Table(1)%UA_BL%C_nalpha      !2*pi  
+   T_f0           =  p%Table(1)%UA_BL%T_f0          !3.0_ReKi  ! seconds
+   T_V0           =  p%Table(1)%UA_BL%T_V0          !6.0_ReKi
+   T_p            =  p%Table(1)%UA_BL%T_p           !1.7_ReKi
+   T_VL           =  p%Table(1)%UA_BL%T_VL          !11.0_ReKi
+   b1             =  p%Table(1)%UA_BL%b1            !0.14_ReKi
+   b2             =  p%Table(1)%UA_BL%b2            !0.53_ReKi
+   b5             =  p%Table(1)%UA_BL%b5            !5.0_ReKi
+   A1             =  p%Table(1)%UA_BL%A1            !0.3_ReKi
+   A2             =  p%Table(1)%UA_BL%A2            !0.70_ReKi
+   A5             =  p%Table(1)%UA_BL%A5            !1.0_ReKi
+   S1             =  p%Table(1)%UA_BL%S1            !0.0262_ReKi   !!!!!!!!!!
+   S2             =  p%Table(1)%UA_BL%S2            !0.0201_ReKi   !!!!!!!!!!
+   S3             =  p%Table(1)%UA_BL%S3            !0.0262_ReKi   !!!!!!!!!!
+   S4             =  p%Table(1)%UA_BL%S4            !0.0201_ReKi   !!!!!!!!!!
+   Cn1            =  p%Table(1)%UA_BL%Cn1           !1.264_ReKi  ! Stall values of Cn
+   Cn2            =  p%Table(1)%UA_BL%Cn2           !-0.833_ReKi
+   St_sh          =  p%Table(1)%UA_BL%St_sh         !0.19_ReKi
+   Cd0            =  p%Table(1)%UA_BL%Cd0           !0.012_ReKi
+   Cm0            =  p%Table(1)%UA_BL%Cm0           !0.0_ReKi
+   k0             =  p%Table(1)%UA_BL%k0            !0.0_ReKi
+   k1             =  p%Table(1)%UA_BL%k1            !0.0_ReKi
+   k2             =  p%Table(1)%UA_BL%k2            !0.0_ReKi
+   k3             =  p%Table(1)%UA_BL%k3            !0.0_ReKi
+   k1_hat         =  p%Table(1)%UA_BL%k1_hat        !0.0_ReKi
+   x_cp_bar       =  p%Table(1)%UA_BL%x_cp_bar      !0.2_ReKi
+   filtCutOff     =  p%Table(1)%UA_BL%filtCutOff    ! 5.0_ReKi  Hz
    
    C_nalpha_circ  =  C_nalpha / sqrt(1.0_ReKi-M**2)
      ! Cn1=1.9 Tp=1.7 Tf=3., Tv=6 Tvl=11, Cd0=0.012

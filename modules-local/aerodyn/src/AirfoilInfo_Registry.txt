@@ -62,21 +62,9 @@ typedef	^	^	            LOGICAL	      ConstData	       -	   -	-	"Flag that tells
 typedef	^	^	            LOGICAL	      InclUAdata	       -	   -	-	"Flag that tells if UA data is included in the input file"	-
 typedef	^	^	            AFI_UA_BL_Type	UA_BL	             -	   -	-	"The tables of Leishman-Beddoes unsteady-aero data for given Re and control setting"	-
 
-# The following derived type stores data for an airfoil for all combinations of Re and control setting.
-typedef	^	AFInfoType	IntKi	         InterpOrd	-	-	-	"Interpolation order"	-
-typedef	^	^	         ReKi	         NonDimArea	-	-	-	"The non-dimensional area of the airfoil (area/chord^2) [unused]"	-
-typedef	^	^	         IntKi	         NumCoords	-	-	-	"The number of coordinates which define the airfoil shape" -
-typedef	^	^	         ReKi	         X_Coord	  {:}	-	-	"X-coordinate for the airfoil shape [unused]"	-
-typedef	^	^	         ReKi	         Y_Coord	  {:}	-	-	"Y-coordinate for the airfoil shape [unused]"	-
-typedef	^	^	         INTEGER	      NumTabs	   -	-	-	"The number of airfoil tables in the airfoil file"	-
-typedef	^	^	         AFI_Table_Type	Table	     {:}	-	-	"The tables of airfoil data for given Re and control setting"	-
-typedef	^	^	         INTEGER	      ColCpmin	   -	-	-	"Column number for Cpmin"	-
-typedef	^	^	         INTEGER	      ColCm	      -	-	-	"Column number for Cm"	-
-
 # ..... Initialization data .......................................................................................................
 # The following derived type stores information that comes from the calling module (say, AeroDyn):
-typedef	^	InitInputType	INTEGER	       NumAFfiles	 -	 -	-	"The number of airfoil files"	-
-typedef	^	^	            CHARACTER(1024) FileNames	{:} -	-	"The name of the file the data were read from"	-
+typedef	^	InitInputType	CHARACTER(1024) FileName    -  -	-	"The name of the file the data is read from"	-
 #typedef	^	^	            INTEGER	       UA_Model	 -	 -	-	"The type of unsteady aero model (1-Beddoes-Leishman)"	-
 typedef  ^  ^              INTEGER         AFTabMod    -  - -  "What type of coef interpolation are we doing? [1 = 1D on AoA (only first table is used, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
 typedef	^	^	            INTEGER	       InCol_Alfa	 -	 -	-	"The column of the coefficient tables that holds the angle of attack"	-
@@ -91,12 +79,18 @@ typedef	^	InitOutputType	ProgDesc	Ver	-	-	-	"This module's name, version, and da
 
 # ..... Parameters ................................................................................................................
 # Define parameters here:
-typedef	^	ParameterType	INTEGER	   ColCd	    -	 -	-	"The column in the p%Coefs arrays that contains Cd data"	-
-typedef	^	^	            INTEGER	   ColCl	    -	 -	-	"The column in the p%Coefs arrays that contains Cl data"	-
-typedef	^	^	            INTEGER	   ColCm	    -	 -	-	"The column in the p%Coefs arrays that contains Cm data"	-
-typedef	^	^	            INTEGER	   ColCpmin	 -	 -	-	"The column in the p%Coefs arrays that contains Cpmin data"	-
-typedef	^	^	            AFInfoType	AFInfo	{:} -	-	"The derived type that stores all the data from the input files"	-
-typedef  ^  ^              INTEGER     AFTabMod  -  - -  "What type of coef interpolation are we doing? [1 = 1D on AoA (only first table is used, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
+typedef	^	ParameterType	INTEGER	      ColCd	    -	 -	-	"The column in the p%Coefs arrays that contains Cd data"	-
+typedef	^	^	            INTEGER	      ColCl	    -	 -	-	"The column in the p%Coefs arrays that contains Cl data"	-
+typedef	^	^	            INTEGER	      ColCm	    -	 -	-	"The column in the p%Coefs arrays that contains Cm data"	-
+typedef	^	^	            INTEGER	      ColCpmin	 -	 -	-	"The column in the p%Coefs arrays that contains Cpmin data"	-
+typedef  ^  ^              INTEGER        AFTabMod  -  - -  "What type of coef interpolation are we doing? [1 = 1D on AoA (only first table is used, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
+typedef	^	^           	IntKi	         InterpOrd	-	-	-	"Interpolation order"	-
+typedef	^	^	            ReKi	         NonDimArea	-	-	-	"The non-dimensional area of the airfoil (area/chord^2) [unused]"	-
+typedef	^	^	            IntKi	         NumCoords	-	-	-	"The number of coordinates which define the airfoil shape" -
+typedef	^	^	            ReKi	         X_Coord	  {:}	-	-	"X-coordinate for the airfoil shape [unused]"	-
+typedef	^	^	            ReKi	         Y_Coord	  {:}	-	-	"Y-coordinate for the airfoil shape [unused]"	-
+typedef	^	^	            INTEGER	      NumTabs	   -	-	-	"The number of airfoil tables in the airfoil file"	-
+typedef	^	^	            AFI_Table_Type	Table	     {:}	-	-	"The tables of airfoil data for given Re and control setting"	-
 
 # ..... Inputs ....................................................................................................................
 # Define inputs that are not on this mesh here:

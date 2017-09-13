@@ -95,14 +95,10 @@ program AFI_Driver
    
    else ! No argument     
       !dvrInitInp%OutRootName  = '.\TestingUA_Driver'
-      InitInputs%NumAFfiles    = 1
-      allocate( InitInputs%FileNames(InitInputs%NumAFfiles), STAT = errStat)
-      if (errStat /= 0 ) then
-         call SetErrStat( ErrID_Fatal, 'Error trying to allocate InitInputs%FileNames', errStat, errMsg, routineName)  
-         stop !call NormStop()
-      end if
       
-      InitInputs%FileNames(1)    = '.\DU25_A17.dat'   
+      
+      
+      InitInputs%FileName      = '.\DU25_A17.dat'   
             ! Establish Initialization input data based on hardcoded airfoil file data
       InitInputs%AFTabMod      =  2  !  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
       InitInputs%InCol_Alfa	 =  1  !  "The column of the coefficient tables that holds the angle of attack"	-
@@ -125,10 +121,10 @@ program AFI_Driver
    
    
       ! Let's verify that for each angle in the airfoil file, we get the recorded values of Cl, Cd, and Cm
-   !do i = 1, p%AFInfo(1)%Table(1)%NumAlf 
-   !   angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+   !do i = 1, p%Table(1)%NumAlf 
+   !   angleRad = p%Table(1)%Alpha(i)
    !   angleDeg = angleRad*R2D
-   !   call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+   !   call AFI_ComputeAirfoilCoefs1D( angleRad, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
    !   write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
    !end do
    
@@ -138,21 +134,21 @@ program AFI_Driver
    tableIndx = (/5, 27, 47, 67, 103/)
    do j = 1, 5
       do i = tableIndx(j)-1, tableIndx(j)
-         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleRad = p%Table(1)%Alpha(i)
          angleDeg = angleRad*R2D
-         call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         call AFI_ComputeAirfoilCoefs1D( angleRad, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
          write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       end do
       
-      angleRad = 0.5_ReKi*(p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)+1) + p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)))
+      angleRad = 0.5_ReKi*(p%Table(1)%Alpha(tableIndx(j)+1) + p%Table(1)%Alpha(tableIndx(j)))
       angleDeg = angleRad*R2D
-      call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+      call AFI_ComputeAirfoilCoefs1D( angleRad, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
       write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       
       do i = tableIndx(j)+1, tableIndx(j)+2
-         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleRad = p%Table(1)%Alpha(i)
          angleDeg = angleRad*R2D
-         call AFI_ComputeAirfoilCoefs1D( angleRad, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         call AFI_ComputeAirfoilCoefs1D( angleRad, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
          write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       end do
       
@@ -163,24 +159,24 @@ program AFI_Driver
       ! We will print values that are in the table before and after the requested angle 
       ! so we can see if the interpolation is reasonable
    tableIndx = (/5, 27, 47, 67, 103/)
-   ReVal = 0.5_ReKi*(p%AFInfo(1)%Table(2)%Re + p%AFInfo(1)%Table(3)%Re)
+   ReVal = 0.5_ReKi*(p%Table(2)%Re + p%Table(3)%Re)
    do j = 1, 5
       do i = tableIndx(j)-1, tableIndx(j)
-         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleRad = p%Table(1)%Alpha(i)
          angleDeg = angleRad*R2D
-         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
          write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       end do
       
-      angleRad = 0.5_ReKi*(p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)+1) + p%AFInfo(1)%Table(1)%Alpha(tableIndx(j)))
+      angleRad = 0.5_ReKi*(p%Table(1)%Alpha(tableIndx(j)+1) + p%Table(1)%Alpha(tableIndx(j)))
       angleDeg = angleRad*R2D
-      call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+      call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
       write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       
       do i = tableIndx(j)+1, tableIndx(j)+2
-         angleRad = p%AFInfo(1)%Table(1)%Alpha(i)
+         angleRad = p%Table(1)%Alpha(i)
          angleDeg = angleRad*R2D
-         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p%AFInfo(1), Cl, Cd, Cm, Cpmin, errStat, errMsg )
+         call AFI_ComputeAirfoilCoefs2D( 1, angleRad, ReVal, p, Cl, Cd, Cm, Cpmin, errStat, errMsg )
          write(*,*) angleDeg, Cl, Cd, Cm, Cpmin
       end do
       
