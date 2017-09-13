@@ -126,7 +126,7 @@ MODULE AirfoilInfo
       END IF
              
          ! Set the lookup model:  1 = 1D, 2 = 2D based on (AoA,Re), 3 = 2D based on (AoA,UserProp)
-      p%DimMod   = InitInput%  DimMod
+      p%AFTabMod   = InitInput%AFTabMod
       
          ! Set the column indices for the various airfoil coefficients as they will be stored in our data structures, 
          !   NOT as they are recorded in the airfoil input file (InitInput%InCol_*) !
@@ -178,19 +178,19 @@ MODULE AirfoilInfo
          
          IF ( p%AFInfo(File)%NumTabs > 1 )  THEN
 
-            IF ( p%DimMod == 2 .or. p%DimMod == 3 ) THEN
+            IF ( p%AFTabMod == 2 .or. p%AFTabMod == 3 ) THEN
                
                ALLOCATE(secondVals(p%AFInfo(File)%NumTabs), STAT=ErrStat2 )
                   IF ( ErrStat2 /= 0 )  THEN
                      CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the p%AFInfo array.', ErrStat, ErrMsg, RoutineName )
                      RETURN
                   ENDIF
-               IF (p%DimMod == 2) THEN
+               IF (p%AFTabMod == 2) THEN
                      
               
                      secondVals(1) = p%AFInfo(File)%Table(1)%Re
                      
-                  ELSE IF (p%DimMod == 3) THEN
+                  ELSE IF (p%AFTabMod == 3) THEN
                      
                
                      secondVals(1) = p%AFInfo(File)%Table(1)%UserProp
@@ -218,7 +218,7 @@ MODULE AirfoilInfo
                      ENDIF
                   END DO ! IA
                   
-                  IF (p%DimMod == 2) THEN
+                  IF (p%AFTabMod == 2) THEN
                      
                         ! Ctrl Value must be the same, Re must be monotonic increasing without repeats
                      IF ( p%AFInfo(File)%Table(Table)%UserProp /= p%AFInfo(File)%Table(1)%UserProp )  THEN
@@ -230,7 +230,7 @@ MODULE AirfoilInfo
                      ENDIF
                      secondVals(Table) = p%AFInfo(File)%Table(Table)%Re
                      
-                  ELSE IF (p%DimMod == 3) THEN
+                  ELSE IF (p%AFTabMod == 3) THEN
                      
                         ! Re must be the same, Ctrl must be different
                      IF ( p%AFInfo(File)%Table(Table)%Re /= p%AFInfo(File)%Table(1)%Re )  THEN
@@ -247,12 +247,12 @@ MODULE AirfoilInfo
                ENDDO ! Tab
                
                   ! Make sure all Re's are monotonic and increasing with no repeats
-               IF (p%DimMod > 1) THEN
+               IF (p%AFTabMod > 1) THEN
                   
                   IF (.NOT. CheckValuesAreUniqueMonotonicIncreasing(secondVals)) THEN
                      ErrMsg2 = 'Fatal Error: airfoil file "'//TRIM( InitInput%FileNames(File) ) &
                                  //'", is not monotonic and increasing in the '
-                     IF (p%DimMod == 2) THEN
+                     IF (p%AFTabMod == 2) THEN
                         ErrMsg2 = trim(ErrMsg2)//' Re Property (ReProp).'
                      ELSE
                         ErrMsg2 = trim(ErrMsg2)//' Ctrl Property (CtrlProp).'
@@ -272,191 +272,19 @@ MODULE AirfoilInfo
             
          ENDIF ! ( p%AFInfo(File)%NumTabs > 1 )
 
-
-            ! Create an array of Re for interpolation and fill it with the LOG(Re) for each table in the file.
-!MLB: Maybe we should just store LogRe when we read in the Re.
-         ALLOCATE ( p%AFInfo(File)%LogRe( p%AFInfo(File)%NumTabs ), STAT=ErrStat2 )
-         IF ( ErrStat2 /= 0 )  THEN
-            CALL SetErrStat ( ErrID_Fatal, 'Error allocating memory for the LogReAry array.', ErrStat, ErrMsg, RoutineName )
-            CALL Cleanup()
-            RETURN
-         ENDIF
-
-         DO Table=1,p%AFInfo(File)%NumTabs
-            p%AFInfo(File)%LogRe(Table) = LOG( p%AFInfo(File)%Table(Table)%Re )
-         END DO ! Table
-
 ! We need to deal with constant data.
 
-            ! Generate the aifoil coefficients array and spline-coefficients arrays from the airfoil coefficients in a form usable by regrid.
 
-!         IF ( p%AFInfo(File)%NumTabs > 1 )  THEN                  ! We use 2D cubic spline interpolation.
-
-
-!                ! Generate the airfoil coefficients array from the airfoil coefficients in a form usable by regrid.
-!                ! This is a scratch array that will be reused for each airfoil coefficient.
-! 
-!             NumAl   = p%AFInfo(File)%Table(1)%NumAlf
-!             NumRe   = p%AFInfo(File)%NumTabs
-!     !        CoefSiz = NumAl*NumRe
-!             CoefSiz = NumAl*NumRe + 8
-!             CALL AllocAry ( Coef, CoefSiz, "array for bicubic-spline coefficients for airfoil data", ErrStat2, ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-!                ! Compute the splines for the drag coefficient.
-! 
-!             CALL AllocAry ( p%AFInfo(File)%CdSpCoef2D, CoefSiz, "array for bicubic-spline coefficients for Cd data" &
-!                           , ErrStat2, ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!                
-!             IF ( ErrStat >= AbortErrLev )  THEN
-!                CALL Cleanup ( )
-!                RETURN
-!             ENDIF
-! 
-!             Indx= 0
-!             DO IA=1,NumAl
-!                DO Table=1,NumRe
-!                   Indx       = Indx + 1
-!                   Coef(Indx) = p%AFInfo(File)%Table(Table)%Coefs(IA,p%ColCd)
-!                ENDDO ! Table
-!             ENDDO ! IA
-! 
-!             CALL FitPack_RegridLite ( NumAl                     , p%AFInfo(File)%Table(1)%Alpha &
-!                                     , NumRe                     , p%AFInfo(File)%LogRe &
-!                                     , CoefSiz                   , Coef &
-!                                     , p%AFInfo(File)%NumCdAoAkts, p%AFInfo(File)%CdAoAknots &
-!                                     , p%AFInfo(File)%NumCdReKts , p%AFInfo(File)%CdReKnots &
-!                                     , CoefSiz                   , p%AFInfo(File)%CdSpCoef2D &
-!                                     , ErrStat2                  , ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-! 
-!                ! Compute the splines for the lift coefficient.
-! 
-!             CALL AllocAry ( p%AFInfo(File)%ClSpCoef2D, CoefSiz, "array for bicubic-spline coefficients for Cl data" &
-!                           , ErrStat2, ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-!             IF ( ErrStat >= AbortErrLev )  THEN
-!                CALL Cleanup ( )
-!                RETURN
-!             ENDIF
-!                
-!             Indx= 0
-!             DO IA=1,NumAl
-!                DO Table=1,NumRe
-!                   Indx       = Indx + 1
-!                   Coef(Indx) = p%AFInfo(File)%Table(Table)%Coefs(IA,p%ColCl)
-!                ENDDO ! Table
-!             ENDDO ! IA
-! 
-!             CALL FitPack_RegridLite ( NumAl                     , p%AFInfo(File)%Table(1)%Alpha &
-!                                     , NumRe                     , p%AFInfo(File)%LogRe &
-!                                     , CoefSiz                   , Coef &
-!                                     , p%AFInfo(File)%NumClAoAkts, p%AFInfo(File)%ClAoAknots &
-!                                     , p%AFInfo(File)%NumClReKts , p%AFInfo(File)%ClReKnots &
-!                                     , CoefSiz                   , p%AFInfo(File)%ClSpCoef2D &
-!                                     , ErrStat2                  , ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-! 
-!                ! Optionally compute the splines for the pitching-moment coefficient.
-! 
-!             IF ( p%ColCm > 0 )  THEN
-! 
-!                CALL AllocAry ( p%AFInfo(File)%CmSpCoef2D, CoefSiz, "array for bicubic-spline coefficients for Cm data" &
-!                              , ErrStat2, ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-!                IF ( ErrStat >= AbortErrLev )  THEN
-!                   CALL Cleanup ( )
-!                   RETURN
-!                ENDIF
-!                
-!                Indx= 0
-!                DO IA=1,NumAl
-!                   DO Table=1,NumRe
-!                      Indx       = Indx + 1
-!                      Coef(Indx) = p%AFInfo(File)%Table(Table)%Coefs(IA,p%ColCm)
-!                   ENDDO ! Table
-!                ENDDO ! IA
-! 
-!                CALL FitPack_RegridLite ( NumAl                     , p%AFInfo(File)%Table(1)%Alpha &
-!                                        , NumRe                     , p%AFInfo(File)%LogRe &
-!                                        , CoefSiz                   , Coef &
-!                                        , p%AFInfo(File)%NumCmAoAkts, p%AFInfo(File)%CmAoAknots &
-!                                        , p%AFInfo(File)%NumCmReKts , p%AFInfo(File)%CmReKnots &
-!                                        , CoefSiz                   , p%AFInfo(File)%CmSpCoef2D &
-!                                        , ErrStat2                  , ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-!             ENDIF ! ( p%ColCm > 0 )
-! 
-! 
-!                ! Optionally compute the splines for the minimum pressure coefficient.
-! 
-!             IF ( p%ColCpmin > 0 )  THEN
-! 
-!                CALL AllocAry ( p%AFInfo(File)%CpminSpCoef2D, CoefSiz, "array for bicubic-spline coefficients for Cpmin data" &
-!                              , ErrStat2, ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!                IF ( ErrStat >= AbortErrLev )  THEN
-!                   CALL Cleanup ( )
-!                   RETURN
-!                ENDIF
-! 
-!                
-!                Indx= 0
-!                DO IA=1,NumAl
-!                   DO Table=1,NumRe
-!                      Indx       = Indx + 1
-!                      Coef(Indx) = p%AFInfo(File)%Table(Table)%Coefs(IA,p%ColCpmin)
-!                   ENDDO ! Table
-!                ENDDO ! IA
-! 
-!                CALL FitPack_RegridLite ( NumAl                        , p%AFInfo(File)%Table(1)%Alpha &
-!                                        , NumRe                        , p%AFInfo(File)%LogRe &
-!                                        , CoefSiz                      , Coef &
-!                                        , p%AFInfo(File)%NumCpminAoAkts, p%AFInfo(File)%CpminAoAknots &
-!                                        , p%AFInfo(File)%NumCpminReKts , p%AFInfo(File)%CpminReKnots &
-!                                        , CoefSiz                      , p%AFInfo(File)%CpminSpCoef2D &
-!                                        , ErrStat2                     , ErrMsg2 )
-!                CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-! 
-!             ENDIF ! ( p%ColCpmin > 0 )
-! 
-! 
-!                ! Deallocate the temporary Coef array.
-! 
-!             IF ( ALLOCATED( Coef ) ) DEALLOCATE( Coef )
-! 
-! 
-!             ! Compute the spline coefficients of the piecewise cubic polynomials for the irregularly-spaced airfoil data in each file.
-!             ! Unless the data are constant.
-! 
-!             DO Co=1,NumCoefs
-! 
-! !BUG: What happened to the 2D interpolation?  Maybe I haven't written this yet.
-! 
-!                CALL SetErrStat ( ErrID_FATAL, 'The part to compute the bi-cubic splines in AFI_Init is not written yet!', ErrStat, ErrMsg, RoutineName )
-!                CALL Cleanup()
-!                RETURN
-! 
-!             END DO ! Co
-
-!         ELSE ! We have only one table.  Use 1-D interpolation.
-
-do iTable = 1, p%AFInfo(File)%NumTabs
+         do iTable = 1, p%AFInfo(File)%NumTabs
                ! Allocate the arrays to hold spline coefficients.
 
-            ALLOCATE ( p%AFInfo(File)%Table(iTable)%SplineCoefs( p%AFInfo(File)%Table(iTable)%NumAlf-1 &
+            allocate ( p%AFInfo(File)%Table(iTable)%SplineCoefs( p%AFInfo(File)%Table(iTable)%NumAlf-1 &
                      , NumCoefs, 0:3 ), STAT=ErrStat2 )
-            IF ( ErrStat2 /= 0 )  THEN
-               CALL SetErrStat ( ErrStat2, 'Error allocating memory for the SplineCoefs array.', ErrStat, ErrMsg, RoutineName )
-               CALL Cleanup()
-               RETURN
-            ENDIF
+            if ( ErrStat2 /= 0 )  then
+               call SetErrStat ( ErrStat2, 'Error allocating memory for the SplineCoefs array.', ErrStat, ErrMsg, RoutineName )
+               call Cleanup()
+               return
+            end if
 
             
                ! Compute the one set of coefficients of the piecewise polynomials for the irregularly-spaced data.
@@ -470,11 +298,11 @@ do iTable = 1, p%AFInfo(File)%NumTabs
                ! bjj: what happens at the end points (these are periodic, so we should maybe extend the tables to make sure the end point?) 
 
                   ! use this for cubic splines:
-               CALL CubicSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
+               call CubicSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
                                      , p%AFInfo(File)%Table(iTable)%Coefs &
                                      , p%AFInfo(File)%Table(iTable)%SplineCoefs &
                                      , ErrStat2, ErrMsg2 )
-               CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+               call SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                            
             else if ( p%AFInfo(File)%InterpOrd == 1_IntKi ) then
                
@@ -482,43 +310,30 @@ do iTable = 1, p%AFInfo(File)%NumTabs
                
                   ! This is not the greatest way to get linear interpolation, but then we can use the same cubic spline routine
                   ! later without checking interp order there
-               CALL CubicLinSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
+               call CubicLinSplineInitM ( p%AFInfo(File)%Table(iTable)%Alpha &
                                      , p%AFInfo(File)%Table(iTable)%Coefs &
                                      , p%AFInfo(File)%Table(iTable)%SplineCoefs &
                                      , ErrStat2, ErrMsg2 )
-               CALL SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+               call SetErrStat ( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                
             else
                
-               CALL SetErrStat ( ErrID_FATAL, 'Airfoil file "'//TRIM( InitInput%FileNames(File) ) &
+               call SetErrStat ( ErrID_FATAL, 'Airfoil file "'//trim( InitInput%FileNames(File) ) &
                                          //'": InterpOrd must be 1 (linear) or 3 (cubic spline).', ErrStat, ErrMsg, RoutineName )
-               CALL Cleanup()
-               RETURN
+               call Cleanup()
+               return
                
             end if
             
-end do                              
-!         ENDIF ! ( p%AFInfo(File)%NumTabs > 1 )
+      end do                              
 
 
             ! Compute the spline coefficients of the piecewise cubic polynomials for the irregularly-spaced airfoil data in each file.
             ! Unless the data are constant.
 
          DO Co=1,NumCoefs
-
-
-            IF ( p%AFInfo(File)%NumTabs > 1 )  THEN                  ! We use 2D cubic spline interpolation.
-
-!BUG: What happened to the 2D interpolation?  Maybe I haven't written this yet.
-
-         !      CALL SetErrStat ( ErrID_FATAL, 'The part to compute the bi-cubic splines in AFI_Init is not written yet!', ErrStat, ErrMsg, RoutineName )
-          !     CALL Cleanup()
-          !     RETURN
-
-! We also need to deal with constant data.
-
-            ELSE                                                     ! We use 1D cubic spline interpolation if the data are not constant.
-
+            
+                  ! We use 1D cubic spline interpolation if the data are not constant.
                IF ( p%AFInfo(File)%Table(1)%ConstData )  THEN
 
                      ! We need to deal with constant data.
@@ -528,8 +343,6 @@ end do
                   RETURN
 
                ENDIF ! p%AFInfo(File)%Table(1)%ConstData
-
-            ENDIF ! ( p%AFInfo(File)%NumTabs > 1 )
 
          END DO ! Co
 
@@ -623,19 +436,25 @@ end do
          ! Process the airfoil shape information if it is included.
 
       CurLine = 1
-
-   DefaultInterpOrd = 3      
-#ifdef LINEAR_INTERP
+      
+      ! Default to linear interpolation
    DefaultInterpOrd = 1      
+#ifdef SPLINE_INTERP
+   DefaultInterpOrd = 3      
 #endif
       
       CALL ParseVarWDefault ( FileInfo, CurLine, 'InterpOrd', AFInfo%InterpOrd, DefaultInterpOrd, ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-         ! These first two parameters are optional, so we don't check for errors. ! bjj: huh???? 
-      
+         
+         ! NonDimArea is currently unused by AirfoilInfo or codes using AirfoilInfo.  GJH 9/13/2017
       CALL ParseVar ( FileInfo, CurLine, 'NonDimArea', AFInfo%NonDimArea, ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         
+         ! NumCoords, with the Coords data, is used for determining the blade shape (currently used 
+         !   for visualization only).  This data (blade coordinates) is passed to the caller via 
+         !   the InitOut%BladeShape data structure, and stored in p%AFInfo()%XCoord, etc.,
+         !   but is currently unused by AFI module.  GJH 9/13/2017
       CALL ParseVar ( FileInfo, CurLine, 'NumCoords' , AFInfo%NumCoords , ErrStat2, ErrMsg2, UnEc )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          IF (ErrStat >= AbortErrLev) THEN

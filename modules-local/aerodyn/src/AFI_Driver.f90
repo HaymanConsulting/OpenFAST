@@ -104,7 +104,7 @@ program AFI_Driver
       
       InitInputs%FileNames(1)    = '.\DU25_A17.dat'   
             ! Establish Initialization input data based on hardcoded airfoil file data
-      InitInputs%DimMod        =  2  !  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
+      InitInputs%AFTabMod      =  2  !  "What type of lookup are we doing? [1 = 1D on AoA, 2 = 2D on AoA and Re, 3 = 2D on AoA and UserProp]" -
       InitInputs%InCol_Alfa	 =  1  !  "The column of the coefficient tables that holds the angle of attack"	-
       InitInputs%InCol_Cl	    =  2  !	"The column of the coefficient tables that holds the lift coefficient"	-
       InitInputs%InCol_Cd	    =  3  !	"The column of the coefficient tables that holds the minimum pressure coefficient"	-

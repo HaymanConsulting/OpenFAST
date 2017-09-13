@@ -60,10 +60,10 @@ Global
 		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Release|Win32.Build.0 = Release|Win32
 		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Release|x64.ActiveCfg = Release|x64
 		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Release|x64.Build.0 = Release|x64
-		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|Win32.ActiveCfg = Unit Tests|Win32
-		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|Win32.Build.0 = Unit Tests|Win32
-		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|x64.ActiveCfg = Unit Tests|x64
-		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|x64.Build.0 = Unit Tests|x64
+		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|Win32.ActiveCfg = Debug_Double|Win32
+		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|Win32.Build.0 = Debug_Double|Win32
+		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|x64.ActiveCfg = Debug_Double|x64
+		{DA16A3A6-3297-4628-9E46-C6FA0E3C4D16}.Unit Tests|x64.Build.0 = Debug_Double|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
