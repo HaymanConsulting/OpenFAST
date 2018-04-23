@@ -40,7 +40,7 @@ typedef     ^                 ^                 SiKi                 WaveDirArr 
 typedef     ^                 ^                 SiKi                 WaveElevC0        {:}{:}   -        -        "Discrete Fourier transform of the instantaneous elevation of incident waves at the platform reference point.  First column is real part, second column is imaginary part"   (meters)
 typedef     ^                 ^                 SiKi                 WaveTime          {:}      -        -        "Simulation times at which the instantaneous second order loads associated with the incident waves are determined"   sec
 
-typedef     ^                 ^                 INTEGER              NWaveElev         -        -        -        "Number of points where the incident wave elevations can be output"  -
+typedef     ^                 ^                 INTEGER              NWaveElevOut         -        -        -        "Number of points where the incident wave elevations can be output"  -
 typedef     ^                 ^                 SiKi                 WaveElevxi        {:}      -        -        "xi-coordinates for points where the incident wave elevations can be output"  (meters)
 typedef     ^                 ^                 SiKi                 WaveElevyi        {:}      -        -        "yi-coordinates for points where the incident wave elevations can be output"  (meters)
 typedef     ^                 ^                 SiKi                 WaveElevXY        {:}{:}   -        -        "Supplied by Driver:  X-Y locations for WaveElevation output (for visualization).  Index 1 corresponds to X or Y coordinate.  Index 2 corresponds to point number."    -
@@ -127,14 +127,15 @@ typedef     ^                MiscVarType       INTEGER              LastIndWave 
 typedef     ^                 ParameterType     DbKi                 DT                -        -        -        "Time step for continuous state integration & discrete state update" seconds
 typedef     ^                 ^                 LOGICAL              WvDiffQTFF        -        -        -        "Full difference QTF second order forces flag" (-)
 typedef     ^                 ^                 LOGICAL              WvSumQTFF         -        -        -        "Full sum QTF second order forces flag" (-)
-typedef     ^                 ^                 INTEGER              NWaveElev         -        -        -        "Number of points where the incident wave elevations can be output"  -
+typedef     ^                 ^                 INTEGER              NWaveElevOut         -        -        -        "Number of points where the incident wave elevations can be output"  -
 typedef     ^                 ^                 INTEGER              NStepWave         -        -        -        "Total number of frequency components = total number of time steps in the incident wave" -
 typedef     ^                 ^                 INTEGER              NStepWave2        -        -        -        "NStepWave / 2" -
 typedef     ^                 ^                 SiKi                 WaveTime          {:}      -        -        "Simulation times at which the instantaneous second order loads associated with the incident waves are determined"   sec
-typedef     ^                 ^                 SiKi                 WaveElev2         {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the NWaveElev points where the incident wave elevations can be output" (meters)
-#typedef     ^                 ^                 SiKi                 WaveElev2D        {:}{:}   -        -        "" (m)
+typedef     ^                 ^                 SiKi                 WaveElevOut2         {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the NWaveElev points where the incident wave elevations can be output" (meters)
+typedef     ^                 ^                 SiKi                 WaveElev2St        {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the  points where wave kinematics are computed" (meters)
+#typedef     ^                 ^                 SiKi                 WaveElevOut2D        {:}{:}   -        -        "" (m)
 #                                                                                                                 "Instantaneous 2nd-order difference frequency correction for the elevation time-series of incident waves at each of the NWaveElev points where the incident wave elevations can be output" (meters)
-#typedef     ^                 ^                 SiKi                 WaveElev2S        {:}{:}   -        -        "" (m)
+#typedef     ^                 ^                 SiKi                 WaveElevOut2S        {:}{:}   -        -        "" (m)
 #                                                                                                                 "Instantaneous 2nd-order sum frequency correction for the elevation time-series of incident waves at each of the NWaveElev points where the incident wave elevations can be output" (meters)
 typedef     ^                 ^                 OutParmType          OutParam          {:}      -        -        ""        -
 typedef     ^                 ^                 INTEGER              NumOuts           -        -        -        ""        -

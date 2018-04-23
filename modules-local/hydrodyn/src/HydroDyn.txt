@@ -164,9 +164,9 @@ typedef   ^                            ^                             Morison_Par
 typedef   ^                            ^                             INTEGER                  PotMod                          -          -          -         "1 if using WAMIT model, 0 if no potential flow model, or 2 if FIT model"    -
 typedef   ^                            ^                             SiKi                     WaveTime                       {:}         -          -         "Array of time samples, (sec)"        -
 typedef   ^                            ^                             INTEGER                  NStepWave                       -          -          -         "Number of data points in the wave kinematics arrays"        -
-typedef   ^                            ^                             INTEGER                  NWaveElev                       -          -          -         "Number of wave elevation outputs"        -
-typedef   ^                            ^                             SiKi                     WaveElev                    {:}{:}         -          -         "Total wave elevation"   -
-typedef   ^                            ^                             SiKi                     WaveElev1                   {:}{:}         -          -         "First order wave elevation"        -
+typedef   ^                            ^                             INTEGER                  NWaveElevOut                       -          -          -         "Number of wave elevation outputs"        -
+typedef   ^                            ^                             SiKi                     WaveElevOut                    {:}{:}         -          -         "Total wave elevation"   -
+typedef   ^                            ^                             SiKi                     WaveElevOut1                   {:}{:}         -          -         "First order wave elevation"        -
 typedef   ^                            ^                             ReKi                     AddF0                       {6}            -          -         "Additional pre-load forces and moments (N,N,N,N-m,N-m,N-m)"    -
 typedef   ^                            ^                             ReKi                     AddCLin                     {6}{6}         -          -         "Additional stiffness matrix"    -
 typedef   ^                            ^                             ReKi                     AddBLin                     {6}{6}         -          -         "Additional linear damping matrix"    -

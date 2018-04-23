@@ -33,6 +33,7 @@ typedef     ^                 ^                 SiKi                 WvLowCOff  
 typedef     ^                 ^                 SiKi                 WvHiCOff          -        -        -        "High cut-off frequency or upper frequency limit of the wave spectrum beyond which the wave spectrum is zeroed.  [used only when WaveMod=2,3,4]"   (rad/s)
 typedef     ^                 ^                 SiKi                 WaveDir           -        -        -        "Mean incident wave propagation heading direction"   (degrees)
 typedef     ^                 ^                 INTEGER              WaveNDir          -        -        -        "Number of wave directions [only used if WaveDirMod = 1] [Must be an odd number -- will be adjusted within the waves module]"     (-)
+typedef     ^                 ^                 LOGICAL              WaveBreak         -        -        -        "Flag for including a breaking wave model and resulting impact loads. [unused when WaveStMod=0] -- set by HydroDyn_Input"  -
 typedef     ^                 ^                 LOGICAL              WaveMultiDir      -        -        -        "Indicates the waves are multidirectional -- set by HydroDyn_Input"  -
 typedef     ^                 ^                 INTEGER              WaveDirMod        -        -        -        "Directional wave spreading function {0: none, 1: COS2S} [only used if WaveMod=6]"   -
 typedef     ^                 ^                 SiKi                 WaveDirSpread     -        -        -        "Spreading coefficient [WaveMod=2,3,4 and WaveDirMod=1]"   -
@@ -51,7 +52,7 @@ typedef     ^                 ^                 DbKi                 WaveTMax   
 typedef     ^                 ^                 SiKi                 WaveTp            -        -        -        "Peak spectral period of incident waves"  (sec)
 typedef     ^                 ^                 SiKi                 WtrDens           -        -        -        "Water density"   (kg/m^3)
 typedef     ^                 ^                 SiKi                 WtrDpth           -        -        -        "Water depth"  (meters)
-typedef     ^                 ^                 INTEGER              NWaveElev         -        -        -        "Number of points where the incident wave elevations can be output"  -
+typedef     ^                 ^                 INTEGER              NWaveElevOut      -        -        -        "Number of points where the incident wave elevations can be output"  -
 typedef     ^                 ^                 SiKi                 WaveElevxi        {:}      -        -        "xi-coordinates for points where the incident wave elevations can be output"  (meters)
 typedef     ^                 ^                 SiKi                 WaveElevyi        {:}      -        -        "yi-coordinates for points where the incident wave elevations can be output"  (meters)
 typedef     ^                 ^                 SiKi                 WaveElevXY        {:}{:}   -        -        "Supplied by Driver:  X-Y locations for WaveElevation output (for visualization).  Index 1 corresponds to X or Y coordinate.  Index 2 corresponds to point number."    -
@@ -82,8 +83,8 @@ typedef     ^                 ^                 SiKi                 WaveAcc    
 typedef     ^                 ^                 SiKi                 PWaveAcc0          {:}{:}{:} -       -        "Instantaneous acceleration of incident waves in the xi- (1), yi- (2), and zi- (3) directions, respectively, at the location (xi,yi,0), at each of the NWaveKin points where the incident wave kinematics will be computed" (m/s^2)
 typedef     ^                 ^                 SiKi                 WaveVel           {:}{:}{:} -       -        "Instantaneous velocity     of incident waves in the xi- (1), yi- (2), and zi- (3) directions, respectively, accounting for stretching, at each of the NWaveKin points where the incident wave kinematics will be computed (The values include both the velocity of incident waves and the velocity of current.)" (m/s)
 typedef     ^                 ^                 SiKi                 PWaveVel0          {:}{:}{:} -       -        "Instantaneous velocity     of incident waves in the xi- (1), yi- (2), and zi- (3) directions, respectively, at the location (xi,yi,0), at each of the NWaveKin points where the incident wave kinematics will be computed (The values include both the velocity of incident waves and the velocity of current.)" (m/s)
-typedef     ^                 ^                 SiKi                 WaveElev          {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the NWaveElev points where the incident wave elevations can be output" (meters)
-
+typedef     ^                 ^                 SiKi                 WaveElevOut       {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the NWaveElevOut points where the incident wave elevations can be output" (meters)
+typedef     ^                 ^                 SiKi                 WaveElevSt        {:}{:}   -        -        "Instantaneous elevation time-series of incident waves at each of the  points where wave kinematics are computed" (meters)
 typedef     ^                 ^                 SiKi                 WaveElevSeries    {:}{:}   -        -        "Instantaneous elevation time-series at each of the points given by WaveElevXY.  Used for making movies of the waves. First index is the timestep. Second index is XY point number corresponding to second index of WaveElevXY." (m)
 
 typedef     ^                 ^                 SiKi                 WaveTime          {:}      -        -        "Simulation times at which the instantaneous elevation of, velocity of, acceleration of, and loads associated with the incident waves are determined" (sec)
@@ -119,11 +120,12 @@ typedef     ^              MiscVarType         INTEGER              DummyMiscVar
 # ..... Parameters ................................................................................................................
 # Define parameters here:
 # Time step for integration of continuous states (if a fixed-step integrator is used) and update of discrete states:
-typedef     ^                 ParameterType     DbKi                 DT                -        -        -        "Time step for continuous state integration & discrete state update" seconds
-typedef     ^                 ^                 DbKi                 WaveTMax          -        -        -        "Analysis time for incident wave calculations; the actual analysis time may be larger than this value in order for the maintain an effecient FFT"  (sec)
-typedef     ^                 ^                 INTEGER              NStepWave         -        -        -        "Total number of frequency components = total number of time steps in the incident wave" -
-typedef     ^                 ^                 INTEGER              WaveNDir          -        -        -        "Number of wave directions [only used if WaveDirMod = 1] [Must be an odd number -- will be adjusted within the waves module]"     (-)
-typedef     ^                 ^                 LOGICAL              WaveMultiDir      -        -        -        "Indicates the waves are multidirectional -- set by HydroDyn_Input"  -
+typedef     ^                 ParameterType      SiKi                 DummyParameter    -        -        -        "Remove this variable if you have parameter data"   -
+#typedef     ^                 ParameterType     DbKi                 DT                -        -        -        "Time step for continuous state integration & discrete state update" seconds
+#typedef     ^                 ^                 DbKi                 WaveTMax          -        -        -        "Analysis time for incident wave calculations; the actual analysis time may be larger than this value in order for the maintain an effecient FFT"  (sec)
+#typedef     ^                 ^                 INTEGER              NStepWave         -        -        -        "Total number of frequency components = total number of time steps in the incident wave" -
+#typedef     ^                 ^                 INTEGER              WaveNDir          -        -        -        "Number of wave directions [only used if WaveDirMod = 1] [Must be an odd number -- will be adjusted within the waves module]"     (-)
+#typedef     ^                 ^                 LOGICAL              WaveMultiDir      -        -        -        "Indicates the waves are multidirectional -- set by HydroDyn_Input"  -
 
 
 # ..... Inputs ....................................................................................................................

@@ -186,9 +186,13 @@ typedef   ^                            ^                             INTEGER    
 # Define inputs that the initialization routine may need here:
 #   e.g.,  the name of the input file,  the file root name,etc.
 #
-typedef   Morison/Morison              InitInputType                 ReKi                     Gravity                          -          -        -         ""    -
+typedef   ^                            InitInputType                 INTEGER                  NStepSim                         -          -        -         ""    -
+typedef   ^                            ^                             ReKi                     Gravity                          -          -        -         ""    -
 typedef   ^                            ^                             ReKi                     WtrDens                          -          -        -         ""    -
 typedef   ^                            ^                             ReKi                     WtrDpth                          -          -        -         ""    -
+typedef   ^                            ^                             ReKi                     WaveDir                          -          -        -         "Needed for breaking waves.  The mean wave direction in degrees. [0 = +X, 90 = +Y]"    -
+typedef   ^                            ^                             LOGICAL                  WaveBreak                        -          -        -         "Flag for including a breaking wave model and resulting impact loads. [unused when WaveStMod=0] -- set by HydroDyn_Input"  -
+typedef   ^                            ^                             ReKi                     SeabedAngle                      -          -        -         "Inclination angle of seabed in direction of wave velocity (degrees) [positive if rising in direction of waves]" -
 typedef   ^                            ^                             ReKi                     MSL2SWL                          -          -        -         ""    -
 typedef   ^                            ^                             INTEGER                  NJoints                          -          -        -         ""    -
 typedef   ^                            ^                             INTEGER                  NNodes                           -          -        -         ""    -
@@ -239,6 +243,7 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             SiKi                     WaveAcc                          {:}{:}{:}  -        -         ""    -
 typedef   ^                            ^                             SiKi                     WaveTime                         {:}        -        -         ""    -
 typedef   ^                            ^                             SiKi                     WaveDynP                         {:}{:}     -        -         ""    -
+typedef   ^                            ^                             SiKi                     WaveElev                         {:}{:}     -        -         ""    -
 typedef   ^                            ^                             SiKi                     WaveVel                          {:}{:}{:}  -        -         ""    -
 typedef   ^                            ^                             INTEGER                  nodeInWater                      {:}{:}     -        -         "Logical flag indicating if the node at the given time step is in the water, and hence needs to have hydrodynamic forces calculated" -
 #
@@ -277,6 +282,7 @@ typedef   ^                            OtherStateType                IntKi      
 typedef   ^                            MiscVarType                   ReKi                     D_F_D                           {:}{:}         -         -         "Distributed viscous drag loads"   -
 typedef   ^                            ^                             ReKi                     D_F_I                           {:}{:}         -         -         "Distributed inertial loads"   -
 typedef   ^                            ^                             ReKi                     D_F_B                           {:}{:}         -         -         "Distributed bounancy loads"   -
+typedef   ^                            ^                             ReKi                     D_F_BW                          {:}{:}         -         -         "Distributed breaking waves loads"   -
 #typedef   ^                            ^                             ReKi                     D_F_DP                          {:}{:}         -         -         "Distributed dynamic pressure loads"   -
 typedef   ^                            ^                             ReKi                     D_F_AM                          {:}{:}         -         -         "Distributed total added mass loads"   -
 typedef   ^                            ^                             ReKi                     D_F_AM_M                        {:}{:}         -         -         "Distributed member added mass loads"   -
@@ -316,6 +322,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             INTEGER                  NDistribMarkers                 -          -         -         ""        -
 #typedef   ^                            ^                             Morison_NodeType        DistribMarkers                  {:}        -         -         ""        -
 typedef   ^                            ^                             INTEGER                  distribToNodeIndx               {:}        -         -         ""        -
+typedef   ^                            ^                             INTEGER                  distribToBreakingIndx            {:}        -         -         ""        -
 typedef   ^                            ^                             INTEGER                  NLumpedMarkers                  -          -         -         ""        -
 typedef   ^                            ^                             INTEGER                  lumpedToNodeIndx                {:}        -         -         ""        -
 typedef   ^                            ^                             SiKi                     WaveVel                         {:}{:}{:}  -         -         ""        -
@@ -326,6 +333,7 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             INTEGER                  elementFillState                {:}        -         -         "State indicating if the element a node is attached to is in the filled fluid [0], above the fluid [1], or in the seabed [2]" -
 typedef   ^                            ^                             INTEGER                  nodeInWater                     {:}{:}     -        -          "Logical flag indicating if the node at the given time step is in the water, and hence needs to have hydrodynamic forces calculated" -
 typedef   ^                            ^                             ReKi                     D_F_B                           {:}{:}     -         -         "Distributed buoyancy loads"   -
+typedef   ^                            ^                             ReKi                     D_F_BW                          {:}{:}{:}     -         -         "Distributed breaking waves loads"   -
 typedef   ^                            ^                             ReKi                     D_F_BF                          {:}{:}     -         -         "Distributed filled buoyancy loads"   -
 typedef   ^                            ^                             ReKi                     D_F_MG                          {:}{:}     -         -         "Distributed marine growth loads"   -
 typedef   ^                            ^                             ReKi                     D_AM_M                          {:}{:}{:}  -         -         "Distributed member added mass matrix"   -

@@ -735,9 +735,9 @@ SUBROUTINE UserWaves_Init ( InitInp, InitOut, ErrStat, ErrMsg )
    ALLOCATE ( InitOut%WaveTime   (0:InitOut%NStepWave                    ) , STAT=ErrStatTmp )
    IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array InitOut%WaveTime.',  ErrStat,ErrMsg,RoutineName)
 
-   ALLOCATE ( InitOut%WaveElev   (0:InitOut%NStepWave,InitInp%NWaveElev  ) , STAT=ErrStatTmp )
-   IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array InitOut%WaveElev.',  ErrStat,ErrMsg,RoutineName)
-   InitOut%WaveElev = 0.0_SiKi
+   ALLOCATE ( InitOut%WaveElevOut (0:InitOut%NStepWave,InitInp%NWaveElevOut  ) , STAT=ErrStatTmp )
+   IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array InitOut%WaveElevOut.',  ErrStat,ErrMsg,RoutineName)
+   InitOut%WaveElevOut = 0.0_SiKi
    
    ALLOCATE ( InitOut%WaveDynP  (0:InitOut%NStepWave,InitInp%NWaveKin  ) , STAT=ErrStatTmp )
    IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array InitOut%WaveDynP.', ErrStat,ErrMsg,RoutineName)
@@ -884,7 +884,7 @@ SUBROUTINE UserWaves_Init ( InitInp, InitOut, ErrStat, ErrMsg )
    END DO
    
    ! WaveElev
-   IF ( InitInp%NWaveElev > 0 ) THEN
+   IF ( InitInp%NWaveElevOut > 0 ) THEN
       CALL GetNewUnit( UnWv )
 
       FileName = TRIM(InitInp%WvKinFile) // '.Elev'
@@ -896,7 +896,7 @@ SUBROUTINE UserWaves_Init ( InitInp, InitOut, ErrStat, ErrMsg )
          RETURN
       END IF
 
-      Frmt = '('//TRIM(Int2LStr(InitInp%NWaveElev))//'(:,A,ES11.4e2))'
+      Frmt = '('//TRIM(Int2LStr(InitInp%NWaveElevOut))//'(:,A,ES11.4e2))'
    
       CALL ReadCom( UnWv, FileName, 'HydroDyn wave elevations file header line 1', ErrStatTmp, ErrMsgTmp )
          CALL SetErrStat( ErrStatTmp, ErrMsgTmp, ErrStat, ErrMsg, RoutineName )
@@ -906,7 +906,7 @@ SUBROUTINE UserWaves_Init ( InitInp, InitOut, ErrStat, ErrMsg )
          END IF
          
       DO i = 0,InitOut%NStepWave-1        
-         Read(UnWv,Frmt)   ( Delim,  InitOut%WaveElev(i,j)  , j=1,InitInp%NWaveElev ) 
+         Read(UnWv,Frmt)   ( Delim,  InitOut%WaveElevOut(i,j)  , j=1,InitInp%NWaveElevOut ) 
       END DO
       CLOSE(UnWv)
    END IF
@@ -916,8 +916,8 @@ SUBROUTINE UserWaves_Init ( InitInp, InitOut, ErrStat, ErrMsg )
    InitOut%WaveVel (InitOut%NStepWave,:,:)  = InitOut%WaveVel (0,:,:)
    InitOut%WaveAcc (InitOut%NStepWave,:,:)  = InitOut%WaveAcc (0,:,:)
    InitOut%WaveDynP(InitOut%NStepWave,:)    = InitOut%WaveDynP(0,:  )
-   InitOut%WaveElev(InitOut%NStepWave,:)     = InitOut%WaveElev(0,:)
-   InitOut%nodeInWater(InitOut%NStepWave,:)  = InitOut%nodeInWater(0,:)
+   InitOut%WaveElevOut(InitOut%NStepWave,:) = InitOut%WaveElevOut(0,:)
+   InitOut%nodeInWater(InitOut%NStepWave,:) = InitOut%nodeInWater(0,:)
    
    
 CONTAINS

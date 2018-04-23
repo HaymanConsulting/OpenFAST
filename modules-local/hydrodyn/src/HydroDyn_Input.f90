@@ -393,8 +393,25 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
          RETURN
       END IF
 
-
-
+      ! WaveBreak - Flag for including a breaking wave model and resulting impact loads. [unused when WaveStMod=0]
+#ifdef BREAKING_WAVES 
+   CALL ReadVar ( UnIn, FileName, InitInp%Waves%WaveBreak, 'WaveBreak', &
+      'Flag for including a breaking wave model and resulting impact loads.', ErrStat2, ErrMsg2, UnEchoLocal )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
+      IF (ErrStat >= AbortErrLev) THEN
+         CALL CleanUp()
+         RETURN
+      END IF
+   CALL ReadVar ( UnIn, FileName, InitInp%Morison%SeabedAngle, 'SeabedAngle', &
+      'Inclination angle of seabed in direction of wave velocity.', ErrStat2, ErrMsg2, UnEchoLocal )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
+      IF (ErrStat >= AbortErrLev) THEN
+         CALL CleanUp()
+         RETURN
+      END IF
+#else
+   InitInp%Waves%WaveBreak = .FALSE.
+#endif
       ! WaveTMax - Analysis time for incident wave calculations.
 
 
@@ -567,7 +584,7 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
 
       ! NWaveElev
 
-   CALL ReadVar ( UnIn, FileName, InitInp%Waves%NWaveElev, 'NWaveElev', &
+   CALL ReadVar ( UnIn, FileName, InitInp%Waves%NWaveElevOut, 'NWaveElev', &
                                   'Number of points where the incident wave elevations can be output', ErrStat2, ErrMsg2, UnEchoLocal )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
       IF (ErrStat >= AbortErrLev) THEN
@@ -580,7 +597,7 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
       ! we need to allocate arrays.  If _GetInput() was skipped, then these array would already have
       ! been allocated and populated.
 
-   IF ( InitInp%Waves%NWaveElev < 0 .OR. InitInp%Waves%NWaveElev > 9 ) THEN
+   IF ( InitInp%Waves%NWaveElevOut < 0 .OR. InitInp%Waves%NWaveElevOut > 9 ) THEN
 
       CALL SetErrStat( ErrID_Fatal, 'NWaveElev must be greater than or equal to zero and less than 10.', ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
       CALL CleanUp()
@@ -589,8 +606,8 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
    ELSE
 
          ! allocate space for the output location arrays:
-      CALL AllocAry( InitInp%Waves%WaveElevxi, InitInp%Waves%NWaveElev, 'WaveElevxi' , ErrStat2, ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
-      CALL AllocAry( InitInp%Waves%WaveElevyi, InitInp%Waves%NWaveElev, 'WaveElevyi' , ErrStat2, ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
+      CALL AllocAry( InitInp%Waves%WaveElevxi, InitInp%Waves%NWaveElevOut, 'WaveElevxi' , ErrStat2, ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
+      CALL AllocAry( InitInp%Waves%WaveElevyi, InitInp%Waves%NWaveElevOut, 'WaveElevyi' , ErrStat2, ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
 
       IF (ErrStat >= AbortErrLev) THEN
          CALL CleanUp()
@@ -601,7 +618,7 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
 
       ! WaveElevxi
 
-   CALL ReadAry ( UnIn, FileName, InitInp%Waves%WaveElevxi, InitInp%Waves%NWaveElev, 'WaveElevxi', &
+   CALL ReadAry ( UnIn, FileName, InitInp%Waves%WaveElevxi, InitInp%Waves%NWaveElevOut, 'WaveElevxi', &
                            'List of xi-coordinates for points where the incident wave elevations can be output', ErrStat2,  ErrMsg2, UnEchoLocal)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
       IF (ErrStat >= AbortErrLev) THEN
@@ -612,7 +629,7 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
 
       ! WaveElevyi
 
-   CALL ReadAry ( UnIn, FileName, InitInp%Waves%WaveElevyi, InitInp%Waves%NWaveElev, 'WaveElevyi', &
+   CALL ReadAry ( UnIn, FileName, InitInp%Waves%WaveElevyi, InitInp%Waves%NWaveElevOut, 'WaveElevyi', &
                            'List of yi-coordinates for points where the incident wave elevations can be output', ErrStat2,  ErrMsg2, UnEchoLocal )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
       IF (ErrStat >= AbortErrLev) THEN
@@ -2407,10 +2424,10 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
 
          ! TODO: We are only implementing WaveStMod = 0 (No stretching) at this point in time. 1 Mar 2013 GJH
 
-   IF ( InitInp%Waves%WaveStMod /= 0 ) THEN
-      CALL SetErrStat( ErrID_Fatal,'WaveStMod must be 0. Future versions of HydroDyn will once again support other wave stretching models.',ErrStat,ErrMsg,RoutineName)
-      RETURN
-   END IF
+   !IF ( InitInp%Waves%WaveStMod /= 0 ) THEN
+   !   CALL SetErrStat( ErrID_Fatal,'WaveStMod must be 0. Future versions of HydroDyn will once again support other wave stretching models.',ErrStat,ErrMsg,RoutineName)
+   !   RETURN
+   !END IF
 
    IF ( InitInp%Waves%WaveMod /= 6 .AND. InitInp%Morison%NMembers > 0 .AND. InitInp%Waves%WaveMod > 0 ) THEN
       
@@ -2420,8 +2437,14 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
          ErrStat = ErrID_Fatal
    
          RETURN
+            END IF
+            
+      IF ( InitInp%Waves%WaveStMod == 0 ) THEN
+         InitInp%Waves%WaveBreak = .FALSE.
+         ! Give informational message
+         CALL SetErrStat( ErrID_Info,'WaveBreak is ignored since WaveStMod=0.',ErrStat,ErrMsg,RoutineName)    
       END IF
-   
+      
       !IF ( ( InitInp%Waves%WaveStMod /= 3 ) .AND. ( InitInp%Waves%WaveMod == 5 ) )  THEN
       !   ErrMsg  = ' WaveStMod must be set to 3 when WaveMod is set to 5.'
       !   ErrStat = ErrID_Fatal
@@ -2441,11 +2464,11 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
          !       drag term from Morison's equation is computed by integrating up to
          !       the MSL, regardless of the instantaneous free surface elevation.
    
-      InitInp%Waves%WaveStMod = 0
+      InitInp%Waves%WaveStMod  = 0
+      InitInp%Waves%WaveBreak = .FALSE.
    
    END IF
-
-
+  
       ! WaveTMax - Analysis time for incident wave calculations.
 
    IF ( InitInp%Waves%WaveMod == 0 )  THEN   ! .TRUE if we have incident waves.
@@ -2605,10 +2628,15 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
       ! We can only use multi directional waves on WaveMod=2,3,4
    InitInp%Waves%WaveMultiDir = .FALSE.         ! Set flag to false to start
    IF ( InitInp%Waves%WaveMod >= 2 .AND. InitInp%Waves%WaveMod <= 4 .AND. InitInp%Waves%WaveDirMod == 1 ) THEN
-      InitInp%Waves%WaveMultiDir = .TRUE.
+      IF ( InitInp%Waves%WaveBreak ) THEN
+         CALL SetErrStat( ErrID_Warn,'WaveDirMod unused if using breaking waves (WaveBreak = TRUE).  Ignoring WaveDirMod.',ErrStat,ErrMsg,RoutineName)
+         InitInp%Waves%WaveDirMod   = 0
+      ELSE     
+         InitInp%Waves%WaveMultiDir = .TRUE.
+      END IF 
    ELSEIF ( (InitInp%Waves%WaveMod < 2 .OR. InitInp%Waves%WaveMod >4) .AND. InitInp%Waves%WaveDirMod == 1 ) THEN
       CALL SetErrStat( ErrID_Warn,'WaveDirMod unused unless WaveMod == 2, 3, or 4.  Ignoring WaveDirMod.',ErrStat,ErrMsg,RoutineName)
-      InitInp%Waves%WaveMod   = 0
+      InitInp%Waves%WaveDirMod   = 0
    ENDIF
 
 
@@ -2710,7 +2738,7 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
 
       ! NWaveElev
 
-   IF ( InitInp%Waves%NWaveElev < 0 ) THEN
+   IF ( InitInp%Waves%NWaveElevOut < 0 ) THEN
 
       CALL SetErrStat( ErrID_Fatal,'NWaveElev must not be negative.',ErrStat,ErrMsg,RoutineName)
       RETURN
@@ -4058,7 +4086,7 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
       ! Current
          ! For wave kinematic calculations, the effective water depth is the user input water depth (positive valued) + MSL2SWL (positive when SWL is above MSL).
       InitInp%Current%WtrDpth    = InitInp%Morison%WtrDpth + InitInp%Morison%MSL2SWL ! Adjust for the MSL2SWL.  
-                                                       
+      InitInp%Current%WaveStMod  = InitInp%Waves%WaveStMod                                        
       
       ! Waves
       InitInp%Waves%Gravity      = InitInp%Gravity
@@ -4073,10 +4101,10 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
          InitInp%Waves2%UnSum       = InitInp%UnSum
          InitInp%Waves2%WtrDpth     = InitInp%Waves%WtrDpth
          InitInp%Waves2%WaveStMod   = InitInp%Waves%WaveStMod
-         InitInp%Waves2%NWaveElev   = InitInp%Waves%NWaveElev
-         CALL AllocAry( InitInp%Waves2%WaveElevxi, InitInp%Waves2%NWaveElev, 'WaveElevxi' , ErrStat2, ErrMsg2)
+         InitInp%Waves2%NWaveElevOut   = InitInp%Waves%NWaveElevOut
+         CALL AllocAry( InitInp%Waves2%WaveElevxi, InitInp%Waves2%NWaveElevOut, 'WaveElevxi' , ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
-         CALL AllocAry( InitInp%Waves2%WaveElevyi, InitInp%Waves2%NWaveElev, 'WaveElevyi' , ErrStat2, ErrMsg2)
+         CALL AllocAry( InitInp%Waves2%WaveElevyi, InitInp%Waves2%NWaveElevOut, 'WaveElevyi' , ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'HydroDynInput_GetInput' )
          IF ( ErrStat >= AbortErrLev ) RETURN 
          InitInp%Waves2%WaveElevxi  = InitInp%Waves%WaveElevxi

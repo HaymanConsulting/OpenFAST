@@ -39,6 +39,8 @@ MODULE Morison
 
    
       ! ..... Public Subroutines ...................................................................................................
+   
+   
    PUBLIC:: Morison_ProcessMorisonGeometry
    
    PUBLIC :: Morison_Init                           ! Initialization routine
@@ -354,6 +356,401 @@ FUNCTION InterpWrappedStpLogical( XValIn, XAry, YAry, Ind, AryLen )
    RETURN
 END FUNCTION InterpWrappedStpLogical ! ( XVal, XAry, YAry, Ind, AryLen )
 
+SUBROUTINE BreakingWaves_Init( simDT, NStepSim, alpha, lambda, waveDir, Gravity, WtrDpth, WtrDens, R, k, NStepWave,  &
+                               waveDT, WaveElev, WaveKinzi, WaveTime ,  &
+                               WaveVel , D_F_BW, ErrStat  , ErrMsg )
+   REAL(DbKi),                INTENT(IN   )  :: simDT
+   INTEGER,                   INTENT(IN   )  :: NStepSim 
+   REAL(ReKi),                INTENT(IN   )  :: alpha           !< Inclination angle of seabed in direction of wave velocity (degrees) [positive if rising in direction of waves]
+   REAL(ReKi),                INTENT(IN   )  :: lambda          !< Curling factor, set to 0.5
+   REAL(ReKi),                INTENT(IN   )  :: waveDir         !< Wave propagation direction [degrees, 0 = +X, 90 = +Y]]
+   REAL(ReKi),                INTENT(IN   )  :: Gravity
+   REAL(SiKi),                INTENT(IN   )  :: WtrDpth
+   REAL(SiKi),                INTENT(IN   )  :: WtrDens
+   REAL(ReKi),                INTENT(IN   )  :: R               !< Outer radius of cylinder
+   REAL(ReKi),                INTENT(IN   )  :: k(3)            !< vector along the cylinder's axial direction
+   INTEGER,                   INTENT(IN   )  :: NStepWave  
+   REAL(SiKi),                INTENT(IN   )  :: waveDT
+   REAL(SiKi),                INTENT(IN   )  :: WaveElev(0:)
+   REAL(SiKi),                INTENT(IN   )  :: WaveKinzi
+   REAL(SiKi),                INTENT(IN   )  :: WaveTime(0:)
+   REAL(SiKi),                INTENT(IN   )  :: WaveVel(0:,:)  
+   REAL(ReKi), ALLOCATABLE,   INTENT(  OUT)  :: D_F_BW(:,:)
+   INTEGER(IntKi),            INTENT(  OUT)  :: ErrStat             !< Error status of the operation
+   CHARACTER(*),              INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
+
+      ! Local variables
+   INTEGER(IntKi) ::  I, J, L                            !< Local loop counters
+   REAL(ReKi)     :: v(3),p(3),pmag, zoneLength, dp, vNormal(3), cosb, kp(3), k_unit(3), WaveNmbr, WaveCelerity, curTroughTime, prevTroughTime
+   REAL(ReKi)     :: period, decay, a, b, threshold, curPeakVel, curPeak, curTrough, wvHt, Tmax, T1, tprime, cosg, Vcosg, Vcosgt_divR, factor1, term1, term2
+   INTEGER(IntKi) :: crossings(NStepWave)
+   INTEGER(IntKi) :: countCrossing, IMOD, NStepWaveSim,  countTrough
+   INTEGER(IntKi) :: countTracking, findPeak, startInc, numInc, T1Inc
+   REAL(SiKi)     :: peaks(NStepWave)
+   REAL(SiKi)     :: peakVel(NStepWave)
+   
+   
+       ! Initialize ErrStat      
+   ErrStat = ErrID_None         
+   ErrMsg  = ""  
+   
+   ALLOCATE ( D_F_BW(3, 0:NStepSim), STAT = ErrStat )
+   IF ( ErrStat /= 0 ) THEN
+      ErrMsg  = ' Error allocating distributed breaking waves loads array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF 
+   D_F_BW = 0.0_ReKi
+   
+   ! TODO: Change this for release, but FOR TESTING alpha will be set to 0.0
+   !alpha = 0.0_ReKi
+   !lambda = 0.5_ReKi
+   decay = exp(-19*tan(alpha*pi/180.0))
+   a = 44*(1-decay)
+   b = 1.6/(1+decay)
+               
+   countCrossing = 0
+   curPeak = 0.0_ReKi
+   curTrough = 0.0_ReKi
+   curTroughTime = 0.0_ReKi
+   prevTroughTime = 0.0_ReKi
+   WaveCelerity = 0.0_ReKi
+   countTrough = 0
+   
+   
+   
+   ! Need to determine cos(gamma) where gamma is the angle between the global Z and themean wave direction and the perpendicular to the member
+   ! The member perpendicular vector is found using: p = k X ( wv X k ) where X is the cross-product, wv is the wave direction vector, k is the vector along the axial direction of the member
+   v(1) = cos(waveDir*pi/180.0)
+   v(2) = sin(waveDir*pi/180.0)
+   v(3) = 0.0_ReKi
+   
+      ! Make sure k is a unit vector
+   k_unit = k / sqrt(dot_product(k,k))
+   
+
+   vNormal(1) = -v(2)
+   vNormal(2) =  v(1)
+   vNormal(3) =  0.0_ReKi
+     
+      ! We want to find the projection of k onto the plane contained by the normal vector, vNormal, to the wave vector, v, and the global Z unit vector
+      ! To do this we use the vector, v, which is the normal to the plane we are interested in
+   kp   = k_unit - dot_product(k_unit,v)*v
+   kp   = kp / sqrt(dot_product(kp,kp))
+   
+      ! Now we find the dot product between the projected vector, kp, and the global Z unit vector
+      ! We set a limit on this side angle to 20 degrees because the breaking waves theory is fomulated in 2D, where their is no side angle!
+   cosb = kp(3)
+   if (cosb < 0.9397) then ! b angle is greater than 20 degrees.
+      return
+   end if
+
+      ! We want to find the projection of k onto the plane contained by the  wave vector, v, and the global Z unit vector
+      ! To do this we use the vector, vNormal, which is the normal to the plane we are interested in
+   kp   = k_unit - dot_product(k_unit,vNormal)*vNormal
+   kp   = kp / sqrt(dot_product(kp,kp));
+   
+      ! Now we find the dot product between the projected vector, kp, and the global Z unit vector
+      ! This is the 2D tilt angle, gamma, in the theory.
+   cosg = kp(3)
+
+
+   
+      ! Loop over all wave times for this node
+      ! NOTE: for purposes of breaking waves calculations we 'throw-out' or ignore all data prior to the first crossing
+
+         
+      ! Need to determine how many wave steps we have based on the simulation time.  NOTE: We may be reusing waves data if the simulation time is larger then the wave time.
+   NStepWaveSim = ceiling(NStepSim*simDT / waveDT)
+   
+   DO I = 1,NStepWaveSim       ! Loop through all time steps
+      
+      ! If I is larger than NStepWave, then we loop back to the beginning vid the MOD function
+      IMOD = mod(I,NStepWave)
+      
+      IF (EqualRealNos(sign(1.0_ReKi,WaveElev(IMOD)) + sign(1.0_ReKi,WaveElev(IMOD-1)),0.0_ReKi)) THEN
+         
+         ! This is a zero crossing
+              
+         countCrossing = countCrossing + 1
+         crossings(countCrossing) = IMOD
+         
+         IF ( sign(1.0_ReKi,WaveElev(IMOD)) > 0.0_ReKi ) THEN
+            if ( curTroughTime > 0.0_ReKi) countTrough = countTrough + 1
+            
+               ! There will be a peak between this current crossing and the next crossing
+            findPeak = 1
+            
+            IF ( countTrough > 1 ) THEN 
+               ! We now have enough information to process the breaking waves-related loads for the current peak
+                  ! wave height
+               wvHt = curPeak - curTrough
+               
+               period = curTroughTime - prevTroughTime
+                  ! Compute the wavenumber:  
+               WaveNmbr   = WaveNumber ( real(2.0*pi/period,SiKi), Gravity, WtrDpth )
+               WaveCelerity = 2.0*pi/(period*WaveNmbr)
+               Vcosg = WaveCelerity*cosg
+               
+                  ! threshold value
+               threshold = b / ( 1/WtrDpth + a/(Gravity*period**2) )
+               
+                  ! Does the wave meet the breaking criteria and is the node in the correct zone (Z-location)
+               IF ( ( WaveKinzi >= ( (1.0_ReKi-lambda)*curPeak ) ) .AND.  ( WaveKinzi <= ( curPeak ) ) .AND. ( wvHt > 0.4*WtrDpth ) .AND. ( wvHt > threshold ) ) THEN
+               
+                     ! This is a breaking wave event and the current node is in the impact zone
+               
+                     ! The force values found below are the total force over the impact zone.  We need to compute the force per unit length
+                     !   load, which requires us to determine a length over which the force is acting.  We are using the distance along the 
+                     !   member which is within the vertical impact zone.  The vertical zone is the distance lambda*curPeak, but the length
+                     !   along the member is the vertical zone length divided by the cosine of the included angle between the axial unit vector of the member
+                     !   and the global Z unit vector, which in this case is simply dividing by the Z-component of the axial vector and making sure it is positive valued
+                  zoneLength = lambda*curPeak / abs(k_unit(3))
+                  
+                     ! The event begins at the zero crossing prior to the wave peak
+                  startInc = ceiling(crossings(countCrossing - 2)*waveDT/simDT)
+                     
+                        ! Find index into the simulation time series
+                     !!!!!!!!!!
+                     
+                        ! Length of event in terms of WaveDT increments
+                  Tmax   = 13*R/(32*WaveCelerity*cosg)
+                  T1     = R/(8*WaveCelerity*cosg)
+                  numInc = ceiling(Tmax / simDT)
+                  T1Inc  = ceiling(T1   / simDT)
+                     
+                     ! Force values for the two intervals
+                  factor1 = lambda*curPeak*WtrDens*R*Vcosg*Vcosg/zoneLength
+                     
+                  IF ( Vcosg < 0.0_ReKi ) THEN
+                     ErrMsg  = ' The term Vcosg is negative when computing breaking waves impulse load.'
+                     ErrStat = ErrID_Fatal
+                     RETURN
+                  END IF
+                     
+                     
+                     ! Set the force value across the two different impact time periods
+                  DO J = 0, T1Inc-1
+                     Vcosgt_divR = Vcosg*J*simDT/R
+                     ! Vector is based on the direction of the wave
+                     IF (J == 0 ) THEN
+                        DO L = 1,3
+                           D_F_BW(L,startInc + J) = factor1*2.0*pi*v(L)
+                        END DO 
+                     ELSE
+                           ! Check if Vcosgt_divR/4 > 1.0
+                        term1 = 1 - ( Vcosgt_divR/4.0 )
+                        IF ( term1 < 0.0_ReKi ) THEN
+                           ErrMsg  = ' Encountered a negative square root when computing breaking waves impulse load.'
+                           ErrStat = ErrID_Fatal
+                           RETURN
+                        END IF   
+                        term2 = sqrt( term1 )
+                           ! Check if term2 => 1 or <= -1
+                        IF ( term2 >= 1.0_ReKi ) THEN
+                           ErrMsg  = ' Quantity <= -1 or >= 1 within the atanh function when computing breaking waves impulse load.'
+                           ErrStat = ErrID_Fatal
+                           RETURN
+                        END IF
+                           
+                        DO L = 1,3          
+                           D_F_BW(L,startInc + J) = factor1 * ( 2.0*pi-2.0*sqrt(Vcosgt_divR)*atanh( term2 ) )*v(L)
+                        END DO 
+                     END IF
+                  END DO
+                  DO J = T1Inc, numInc
+                     tprime = J*simDT - R / (32.0*Vcosg)
+                     Vcosgt_divR = Vcosg*tprime/R
+                        ! Check if Vcosgt_divR/4 > 1.0
+                     term1 = 1 - (( Vcosgt_divR/4.0 ) )*sqrt(6*Vcosgt_divR) 
+                     IF ( term1 < 0.0_ReKi ) THEN
+                        ErrMsg  = ' Encountered a negative square root when computing breaking waves impulse load.'
+                        ErrStat = ErrID_Fatal
+                        RETURN
+                     END IF   
+                     term2 = sqrt( term1 )
+                        ! Check if term2 => 1 or <= -1
+                     IF ( term2 >= 1.0_ReKi ) THEN
+                        ErrMsg  = ' Quantity <= -1 or >= 1 within the atanh function when computing breaking waves impulse load.'
+                        ErrStat = ErrID_Fatal
+                        RETURN
+                     END IF
+                     DO L = 1,3
+                        D_F_BW(L,startInc + J) = factor1 * ( pi*sqrt(1/(6.0*Vcosgt_divR)) - ( (8.0*Vcosgt_divR/3.0)**.25 )*atanh( term2 ) )*v(L)
+                     END DO   
+                  END DO
+                     
+               END IF  ! Is breaking wave event??
+               
+            END IF ! crossingCount > 2
+            curPeak = 0.0_ReKi
+         ELSE          
+            
+               ! There will be a trough between this current crossing and the next
+            findPeak = -1
+            prevTroughTime = curTroughTime
+            curTrough = 0.0_ReKi
+            
+         END IF
+         
+      END IF  ! Zero-crossing ??
+      
+      IF (countCrossing > 0) THEN
+         IF (findPeak > 0) THEN
+            IF (WaveElev(IMOD) > curPeak ) THEN
+               curPeak = WaveElev(IMOD)
+              ! curPeakVel = sqrt( WaveVel(IMOD,1)*WaveVel(IMOD,1) + WaveVel(IMOD,2)*WaveVel(IMOD,2) + WaveVel(IMOD,3)*WaveVel(IMOD,3) )
+               
+              ! Vcosg      = curPeakVel*cosg
+            END IF
+         ELSE
+            IF (WaveElev(IMOD) < curTrough ) THEN
+               curTrough = WaveElev(IMOD)
+               curTroughTime = IMOD*waveDT
+            END IF
+         END IF
+      END IF  
+      
+   END DO
+   
+END SUBROUTINE BreakingWaves_Init
+                               
+                               
+!SUBROUTINE BreakingWaves_Init(Gravity, WaveStMod, WtrDpth, NStepWave, NNodes,  &
+!                          WaveElev, WaveKinzi, WaveTime, &
+!                          WaveVel ,   &
+!                          nodeInWater, ErrStat, ErrMsg )
+!
+!   REAL(ReKi),       INTENT(IN   )  :: Gravity
+!   INTEGER,          INTENT(IN   )  :: WaveStMod
+!   REAL(SiKi),       INTENT(IN   )  :: WtrDpth
+!   INTEGER,          INTENT(IN   )  :: NStepWave
+!   INTEGER,          INTENT(IN   )  :: NNodes              
+!   REAL(SiKi),       INTENT(IN   )  :: WaveElev(0:,:)
+!   REAL(SiKi),       INTENT(IN   )  :: WaveKinzi(:)
+!   REAL(SiKi),       INTENT(IN   )  :: WaveTime(0:)
+!   REAL(SiKi),       INTENT(IN   )  :: WaveVel(0:,:,:)  
+!   INTEGER(IntKi),   INTENT(IN   )  :: nodeInWater(0:,:)
+!   INTEGER(IntKi),   INTENT(  OUT)  :: ErrStat             !< Error status of the operation
+!   CHARACTER(*),     INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
+!
+!      ! Local variables
+!   INTEGER(IntKi) ::  I, J, K, KK                            !< Local loop counters
+!   !INTEGER(IntKi) ::  zGtr0Ind                        !< Index into the MapNodesToZGtr0Nodes array for nodes whose Z coordinate is > 0.0
+!   !REAL(SiKi) :: wavekinzloc ,WavePVel0loc
+!   REAL(SiKi) :: period(NStepWave)
+!   INTEGER(IntKi) :: crossing(NStepWave)
+!   INTEGER(IntKi) :: countPeak
+!   INTEGER(IntKi) :: countTracking
+!   INTEGER(IntKi) :: peakInd(NStepWave)
+!   REAL(SiKi) :: peaks(NStepWave)
+!   REAL(SiKi) :: peakVel(NStepWave)
+!       ! Initialize ErrStat      
+!   ErrStat = ErrID_None         
+!   ErrMsg  = ""               
+!      
+!   ! For breaking waves, the loads are generated if a wave with the critical steepness is located over the node at any given time, t, AND
+!   !   This node in question is located within the impact zone of that wave.
+!   !   So,  IsThisABreaker() == TRUE  if (WaveSteepness(x,y,t) > criticalSteepness) .AND.   ( zMinBreakerImpactZ < = nodeZLoc <= zMaxBreakerImpactZ)  ELSE FALSE
+!   !   To find the wave steepness we need to first identify the 
+!   
+!   countTracking = 0
+!   DO J = 1,NNodes
+!      
+!      if ( WaveKinzi(J) <= 0.0_ReKi ) then
+!         MapMeshNodesToBreakingInd(J) = 0   ! Set this node to point to the '0th' node which has 0.0 for the breaking force at all wave times.
+!      else
+!         countTracking = countTracking + 1
+!         MapMeshNodesToBreakingInd(J) = countTracking
+!      end if
+!   end do
+!   
+!         
+!   allocate ( DF_Breaking, 0:NStepWave,0:countTracking )
+!   
+!      ! Create a '0th' node value of zero for all time steps
+!   DF_Breaking(:,0) = 0.0_ReKi
+!       
+!   DO J = 1,NNodes
+!      
+!      if ( WaveKinzi(J) > 0.0_ReKi ) then
+!         
+!         countCrossing = 0
+!         countPeak = 0
+!         countTrough = 0
+!      
+!         DO I = 1,NStepWave-1       ! Loop through all time steps
+!         
+!            if (EqualRealNos(sign(1.0_ReKi,WaveElev(I,J)) + sign(1.0_ReKi,WaveElev(I-1,J)),ReKi)) then
+!               ! This is a zero crossing
+!            
+!               countCrossing = countCrossing + 1
+!               crossing(countCrossing) = I
+!             
+!             
+!               if (countCrossing >= 1 ) then
+!                  period(countCrossing-1) = 2*(crossing(countCrossing) - crossing(countCrossing))* DT
+!                  if (WaveElev(crossing(countCrossing-1)+1 > 0) then
+!                     KK = crossing(countCrossing-1)
+!                     countPeak = countPeak + 1
+!                     do K = crossing(countCrossing-1),crossing(countCrossing)
+!                        if (WaveElev(K,J) > peaks(countPeak)) then
+!                           KK = K                      
+!                        end if
+!                     end do
+!                     peakInd(countPeak) = KK
+!                     peaks(countPeak) = WaveElev(KK,J)
+!                     peakVel(countPeak) = sqrt( WaveVel(KK,J,1)*WaveVel(KK,J,1) + WaveVel(KK,J,2)*WaveVel(KK,J,2) + WaveVel(KK,J,3)*WaveVel(KK,J,3) )
+!
+!                  else 
+!                     KK = crossing(countCrossing-1)
+!                     countTrough = countTrough + 1
+!                     do K = crossing(countCrossing-1),crossing(countCrossing)
+!                        if (WaveElev(K,J) < troughs(countTrough)) then
+!                        
+!                           KK = K    
+!                        end if
+!                     end do
+!                     troughInd(countTrough) = KK
+!                     troughs(countTrough)   = WaveElev(KK,J)
+!                     curWvHt   = peaks(countPeak) - troughs(countTrough)
+!                     waveHt(countHeights) = curWvHt
+!                     ! Test for breaking 
+!                     alpha = 0
+!                     decay = exp(-19*tan(alpha))
+!                     a = 44*(1-decay)
+!                     b = 1.6/(1+decay)
+!                     Hthresh = b / ( 1/WtrDpth + a/(Gravity*period(countCrossing-1)^2) )
+!                     if ( WaveKinzi(J)>=peaks(countPeak)/2) .AND. (( curWvHt > 0.4*WtrDpth ) .AND. ( curWvHt > Hthresh ) then
+!                        %% Breaking wave force
+!                        R = 0.075/2;    % D = 7.5 cm
+!                        d = 0.26;
+!                        V = 2.3;        % Horizontal velocity
+!                        eta_b = 0.14;   % Breaking wave height
+!                        rho = 1025;     % water density
+! 
+!                        dt = ( (1/8)*R/V )/20
+!                        t1 = [0:dt:(1/8)*R/V];
+!                        offset = (1/32)*R/V;
+!                        t2 = [ (3/32)*R/V+offset+dt:dt:(12/32)*R/V+offset];
+!    
+!                        F1 = 0.5*eta_b*rho*R*V^2*(2*pi - 2*sqrt(V*t1/R).*atanh( sqrt( 1 - 0.25*V*t1/R ) ) );
+!                        F2 = 0.5*eta_b*rho*R*V^2*(pi*sqrt( (1/6)./(V*t2/R) ) - sqrt( (8/3)*V*t2/R ).^0.25.*atanh( sqrt( 1 - (V*t2/R).*sqrt( 6*V*t2/R ) ) ));
+!
+!                     end if
+!               
+!                  end if
+!               
+!               end if
+!         
+!            end if
+!     
+!         END DO
+!      end if
+!                          
+!   END DO
+!END SUBROUTINE BreakingWaves_Init
+   
 SUBROUTINE DistrBuoyancy( densWater, R, tMG, dRdz, Z, C, g, F_B  ) 
 
    REAL(ReKi),         INTENT ( IN    )  :: densWater
@@ -3283,18 +3680,109 @@ END SUBROUTINE CreateLumpedMesh
 !   END IF
 !                       
 !end subroutine ComputeDistributedLoadsAtNode
-                                          
-                                  
-SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWave, WaveAcc, WaveDynP, numNodes, nodes, nodeInWater, numElements, elements, &
-                                  numDistribMarkers,  distribMeshIn, distribMeshOut, distribToNodeIndx,  D_F_I,      &
-                                  D_F_B, D_F_DP, D_F_MG, D_F_BF, D_AM_M, D_AM_MG, D_AM_F, D_dragConst, elementWaterStateArr, &
+                              
+!SUBROUTINE BreakingWaves(NStepWave, WaveElev(:))
+!   
+!   crossMinus  = 0
+!   crossPlus   = 0
+!   cross0      = 0
+!   peakValid   = .FALSE.
+!   peakVel     = 0.0
+!   peak        = 0
+!   troughValid = .FALSE.
+!   trough      = 0
+!      
+!   DO I = 1,NStepWave-1       ! Loop through all time steps
+!         
+!      IF (EqualRealNos(sign(1.0_ReKi,WaveElev(I)) + sign(1.0_ReKi,WaveElev(I-1)),ReKi)) THEN
+!         ! This is a zero crossing
+!            
+!         countCrossing = countCrossing + 1
+!         crossings(countCrossing) = I
+!             
+!             
+!         IF (countCrossing > 1 ) THEN
+!                     
+!            period(countCrossing-1) = 2*(crossings(countCrossing) - crossings(countCrossing-1))* DT
+!                     
+!            ! Check the index after the first crossing and see if it is positive. If yes, then there is a peak between the two crossings.
+!            !  Else there is a trough between the two crossings
+!                     
+!            if (WaveElev(crossings(countCrossing-1)+1) > 0) then
+!               KK = crossings(countCrossing-1)
+!               countPeak = countPeak + 1
+!               do K = crossings(countCrossing-1),crossings(countCrossing)
+!                  if (WaveElev(K,J) > peaks(countPeak)) then
+!                     KK = K                      
+!                  end if
+!               end do
+!               peakInd(countPeak) = KK
+!               peaks(countPeak) = WaveElev(KK,J)
+!               peakVel(countPeak) = sqrt( WaveVel(KK,J,1)*WaveVel(KK,J,1) + WaveVel(KK,J,2)*WaveVel(KK,J,2) + WaveVel(KK,J,3)*WaveVel(KK,J,3) )
+!
+!            else 
+!               KK = crossing(countCrossing-1)
+!               countTrough = countTrough + 1
+!               do K = crossing(countCrossing-1),crossing(countCrossing)
+!                  if (WaveElev(K,J) < troughs(countTrough)) then
+!                        
+!                     KK = K    
+!                  end if
+!               end do
+!               troughInd(countTrough) = KK
+!               troughs(countTrough)   = WaveElev(KK,J)
+!               curWvHt   = peaks(countPeak) - troughs(countTrough)
+!               waveHt(countHeights) = curWvHt
+!               ! Test for breaking 
+!               alpha = 0
+!               decay = exp(-19*tan(alpha))
+!               a = 44*(1-decay)
+!               b = 1.6/(1+decay)
+!               Hthresh = b / ( 1/WtrDpth + a/(Gravity*period(countCrossing-1)^2) )
+!               IF (( WaveKinzi(J)>=peaks(countPeak)/2) .AND. (( curWvHt > 0.4*WtrDpth ) .AND. ( curWvHt > Hthresh ))) THEN
+!                  !%% Breaking wave force
+!                  !R = 0.075/2    ! D = 7.5 cm
+!                  !d = 0.26       !
+!                  !V = 2.3        ! Horizontal velocity
+!                  !eta_b = 0.14   ! Breaking wave height
+!                  !rho = 1025     ! water density
+! 
+!                  dt = ( (1/8)*R/V )/20
+!                  t1 = [0:dt:(1/8)*R/V]
+!                  offset = (1/32)*R/V
+!                  t2 = [ (3/32)*R/V+offset+dt:dt:(12/32)*R/V+offset]
+!    
+!                  F1 = 0.5*eta_b*rho*R*V^2*(2*pi - 2*sqrt(V*t1/R).*atanh( sqrt( 1 - 0.25*V*t1/R ) ) )
+!                  F2 = 0.5*eta_b*rho*R*V^2*(pi*sqrt( (1/6)./(V*t2/R) ) - sqrt( (8/3)*V*t2/R ).^0.25.*atanh( sqrt( 1 - (V*t2/R).*sqrt( 6*V*t2/R ) ) ))
+!
+!               END IF
+!               
+!            end if
+!               
+!         end if
+!         
+!      end if
+!     
+!   END DO
+!         
+!END SUBROUTINE BreakingWaves
+SUBROUTINE CreateDistributedMesh( simDT, NStepSim, densWater, gravity, SeabedAngle, MSL2SWL, wtrDpth, waveDir, WaveBreak, NStepWave, WaveTime, WaveElev, WaveVel, WaveAcc, WaveDynP, numNodes, nodes, nodeInWater, numElements, elements, &
+                                  numDistribMarkers,  distribMeshIn, distribMeshOut, distribToNodeIndx,  distribToBreakingIndx, D_F_I,      &
+                                  D_F_B, D_F_BW, D_F_DP, D_F_MG, D_F_BF, D_AM_M, D_AM_MG, D_AM_F, D_dragConst, elementWaterStateArr, &
                                   Morison_Rad, ErrStat, ErrMsg )
-
+   REAL(DbKi),                             INTENT( IN    )  ::  simDT
+   INTEGER,                                INTENT( IN    )  ::  NStepSim
    REAL(ReKi),                             INTENT( IN    )  ::  densWater
    REAL(ReKi),                             INTENT( IN    )  ::  gravity
+   REAL(ReKi),                             INTENT( IN    )  ::  SeabedAngle
    REAL(ReKi),                             INTENT( IN    )  ::  MSL2SWL
    REAL(ReKi),                             INTENT( IN    )  ::  wtrDpth
+   REAL(ReKi),                             INTENT( IN    )  ::  waveDir
+   LOGICAL,                                INTENT( IN    )  ::  WaveBreak
    INTEGER,                                INTENT( IN    )  ::  NStepWave
+   REAL(SiKi),                             INTENT( IN    )  ::  WaveTime(0:)
+   REAL(SiKi),                             INTENT( IN    )  ::  WaveElev(0:,:)
+   REAL(SiKi),                             INTENT( IN    )  ::  WaveVel(0:,:,:)
    REAL(SiKi),                             INTENT( IN    )  ::  WaveAcc(0:,:,:)
    REAL(SiKi),                             INTENT( IN    )  ::  WaveDynP(0:,:)
    INTEGER,                                INTENT( IN    )  ::  numNodes
@@ -3307,8 +3795,10 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
    TYPE(MeshType),                         INTENT(   OUT )  ::  distribMeshIn
    TYPE(MeshType),                         INTENT(   OUT )  ::  distribMeshOut 
    INTEGER, ALLOCATABLE,                   INTENT(   OUT )  ::  distribToNodeIndx(:)
+   INTEGER, ALLOCATABLE,                   INTENT(   OUT )  ::  distribToBreakingIndx(:)
    REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_I(:,:,:) 
    REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_B(:,:)                      ! Buoyancy force associated with the member
+   REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_BW(:,:,:)                     ! Breaking wave force associated with the member
    REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_DP(:,:,:)                   ! Dynamic pressure force
    REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_MG(:,:)                     ! Marine growth weight
    REAL(ReKi),ALLOCATABLE,                 INTENT(   OUT)   ::  D_F_BF(:,:)                     ! Flooded buoyancy force
@@ -3329,7 +3819,9 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
    TYPE(Morison_NodeType)     ::  node1, node2
    REAL(ReKi)                 ::  L
    REAL(ReKi)                 ::  k(3)
-   REAL(R8Ki)                 :: orientation(3,3)
+   REAL(R8Ki)                 ::  orientation(3,3)
+   REAL(SiKi)                 ::  waveDT
+   INTEGER                    ::  breakerCount
   
   ! REAL(ReKi),ALLOCATABLE     ::  F_DP(:,:)
    REAL(ReKi)                 ::  F_B(6)
@@ -3337,8 +3829,20 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
    REAL(ReKi),ALLOCATABLE     :: F_I(:,:)
    REAL(ReKi)                 ::  z0
    INTEGER, ALLOCATABLE       :: nodeToDistribIndx(:)
+   INTEGER                    :: numBreakerNodes
+   INTEGER                    :: countCrossing 
+   INTEGER                    :: countPeak
+   INTEGER                    :: countTrough
+   REAL(ReKi),ALLOCATABLE     :: peaks
+   REAL(ReKi),ALLOCATABLE     :: crossings
+   REAL(ReKi),ALLOCATABLE     :: troughs
+   REAL(ReKi),ALLOCATABLE     :: tmpD_F_BW(:,:)
    
+      ! Calculate waveDT from the WaveTime array
+   waveDT = WaveTime(1) - WaveTime(0)
+      
    numDistribMarkers = 0
+   numBreakerNodes   = 0
    z0                = -(wtrDpth) ! The total sea depth is the still water depth of the seabed 
    
       ! Count how many distributed markers we need to create by looping over the nodes
@@ -3349,6 +3853,11 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
             
          numDistribMarkers = numDistribMarkers + 1
       
+      END IF
+      
+         ! Only calculate breaking waves WaveBreak = TRUE (in this case, input validation guaranteed that WaveStMod > 0 !! )
+      IF ( WaveBreak .AND. nodes(I)%JointPos(3) > MSL2SWL  ) THEN
+         numBreakerNodes = numBreakerNodes + 1
       END IF
       
    END DO
@@ -3423,6 +3932,22 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
    END IF
    D_F_B = 0.0
    
+   ALLOCATE ( distribToBreakingIndx( numDistribMarkers ), STAT = ErrStat )
+   IF ( ErrStat /= ErrID_None ) THEN
+      ErrMsg  = ' Error allocating space for the distribToBreakingIndx array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF
+   distribToBreakingIndx = 0        ! This is the placeholder index in the breaking wave arrays when there is no breaking event at a given node
+
+   ALLOCATE ( D_F_BW( 3, 0:NStepSim, 0:numBreakerNodes ), STAT = ErrStat )
+   IF ( ErrStat /= ErrID_None ) THEN
+      ErrMsg  = ' Error allocating space for the distributed breaking waves forces array.'
+      ErrStat = ErrID_Fatal
+      RETURN
+   END IF
+   D_F_BW = 0.0
+   
    ALLOCATE ( D_F_DP( 0:NStepWave, 6, numDistribMarkers ), STAT = ErrStat )
    IF ( ErrStat /= ErrID_None ) THEN
       ErrMsg  = ' Error allocating space for the distributed dynamic pressure forces/moments array.'
@@ -3487,6 +4012,7 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
    ! the element A load.
    
    count = 1 
+   numBreakerNodes = 0
    
    DO I=1,numNodes
       
@@ -3646,14 +4172,97 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
          
          distribToNodeIndx(count) = I
          nodeToDistribIndx(I) = count
-         count = count + 1    
+         count = count + 1 
+         
+         !IF ( WaveBreak .AND. nodes(I)%JointPos(3) > MSL2SWL  )  THEN
+         !   numBreakerNodes = numBreakerNodes + 1
+         !   distribToBreakingIndx(count) = numBreakerNodes  ! Maps a master node index into the breaking waves arrays
+         !   call BreakingWaves(NStepWave, WaterDpth, gravity, WaveVel, ...)
+         !   
+         !   countCrossing = 0
+         !   countPeak = 0
+         !   countTrough = 0
+         !
+         !   DO I = 1,NStepWave-1       ! Loop through all time steps
+         !
+         !      if (EqualRealNos(sign(1.0_ReKi,WaveElev(I,J)) + sign(1.0_ReKi,WaveElev(I-1,J)),ReKi)) then
+         !         ! This is a zero crossing
+         !   
+         !         countCrossing = countCrossing + 1
+         !         crossings(countCrossing) = I
+         !    
+         !    
+         !         if (countCrossing > 1 ) then
+         !            
+         !            period(countCrossing-1) = 2*(crossings(countCrossing) - crossings(countCrossing-1))* DT
+         !            
+         !            ! Check the index after the first crossing and see if it is positive. If yes, then there is a peak between the two crossings.
+         !            !  Else there is a trough between the two crossings
+         !            
+         !            if (WaveElev(crossings(countCrossing-1)+1) > 0) then
+         !               KK = crossings(countCrossing-1)
+         !               countPeak = countPeak + 1
+         !               do K = crossings(countCrossing-1),crossings(countCrossing)
+         !                  if (WaveElev(K,J) > peaks(countPeak)) then
+         !                     KK = K                      
+         !                  end if
+         !               end do
+         !               peakInd(countPeak) = KK
+         !               peaks(countPeak) = WaveElev(KK,J)
+         !               peakVel(countPeak) = sqrt( WaveVel(KK,J,1)*WaveVel(KK,J,1) + WaveVel(KK,J,2)*WaveVel(KK,J,2) + WaveVel(KK,J,3)*WaveVel(KK,J,3) )
+         !
+         !            else 
+         !               KK = crossing(countCrossing-1)
+         !               countTrough = countTrough + 1
+         !               do K = crossing(countCrossing-1),crossing(countCrossing)
+         !                  if (WaveElev(K,J) < troughs(countTrough)) then
+         !               
+         !                     KK = K    
+         !                  end if
+         !               end do
+         !               troughInd(countTrough) = KK
+         !               troughs(countTrough)   = WaveElev(KK,J)
+         !               curWvHt   = peaks(countPeak) - troughs(countTrough)
+         !               waveHt(countHeights) = curWvHt
+         !               ! Test for breaking 
+         !               alpha = 0
+         !               decay = exp(-19*tan(alpha))
+         !               a = 44*(1-decay)
+         !               b = 1.6/(1+decay)
+         !               Hthresh = b / ( 1/WtrDpth + a/(Gravity*period(countCrossing-1)**2) )
+         !               IF (( WaveKinzi(J)>=peaks(countPeak)/2) .AND. (( curWvHt > 0.4*WtrDpth ) .AND. ( curWvHt > Hthresh ))) THEN
+         !                  !%% Breaking wave force
+         !                  !R = 0.075/2    ! D = 7.5 cm
+         !                  !d = 0.26       !
+         !                  !V = 2.3        ! Horizontal velocity
+         !                  !eta_b = 0.14   ! Breaking wave height
+         !                  !rho = 1025     ! water density
+         !
+         !                  dt = ( (1/8)*R/V )/20
+         !                  t1 = [0:dt:(1/8)*R/V]
+         !                  offset = (1/32)*R/V
+         !                  t2 = [ (3/32)*R/V+offset+dt:dt:(12/32)*R/V+offset]
+         !
+         !                  F1 = 0.5*eta_b*rho*R*V^2*(2*pi - 2*sqrt(V*t1/R).*atanh( sqrt( 1 - 0.25*V*t1/R ) ) )
+         !                  F2 = 0.5*eta_b*rho*R*V^2*(pi*sqrt( (1/6)./(V*t2/R) ) - sqrt( (8/3)*V*t2/R ).^0.25.*atanh( sqrt( 1 - (V*t2/R).*sqrt( 6*V*t2/R ) ) ))
+         !
+         !               END IF
+         !      
+         !            end if
+         !      
+         !         end if
+         !
+         !      end if
+         !
+         !   END DO
+         !END IF
          
       END IF
       
    END DO
    
    ! Now for time-varying values
-    
+   breakerCount = 0
    DO count=1,numDistribMarkers
      J = distribToNodeIndx(count)
      DO I=0,NStepWave    
@@ -3698,7 +4307,32 @@ SUBROUTINE CreateDistributedMesh( densWater, gravity, MSL2SWL, wtrDpth, NStepWav
          
       END IF
       
-     END DO   ! DO I=0,NStepWave  
+      ! Handle breaking waves
+      !IF ( WaveBreak  .AND. elementWaterStateArr(I,count) == 1) THEN
+      !   IF ( nodes(J)%JointPos(3) > MSL2SWL ) THEN
+      !      ! This is node could potentially have a breaking wave load
+      !      
+      !   END IF
+      !   
+      !   
+      !END IF
+      
+      
+     END DO   ! DO I=0,NStepWave 
+     
+     IF ( (WaveBreak ) .AND. ( nodes(J)%JointPos(3) > MSL2SWL ) ) THEN
+            ! Find all the crossings of SWL for this node
+         !crossings = FindWaveCrossings()
+            ! Now determine all wave peaks, wave troughs, wave heights
+         breakerCount = breakerCount + 1
+         distribToBreakingIndx(J) = breakerCount
+         call BreakingWaves_Init(  simDT, NStepSim, SeabedAngle, 0.5, waveDir, gravity, real(wtrDpth,SiKi), real(densWater,SiKi),  nodes(J)%R, nodes(J)%R_LToG(:,3), NStepWave,  &
+                               waveDT, WaveElev(:,J), real(nodes(J)%JointPos(3),SiKi), WaveTime ,  &
+                               WaveVel(:,J,:) , tmpD_F_BW, ErrStat  , ErrMsg )
+         D_F_BW(:,:,breakerCount) = tmpD_F_BW
+        
+     END IF
+     
    END DO     ! DO count=1,numDistribMarkers
                                   
    
@@ -4052,7 +4686,7 @@ SUBROUTINE Morison_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       TYPE(Morison_InitOutputType),      INTENT(  OUT)  :: InitOut     !< Output for initialization routine
       INTEGER(IntKi),                    INTENT(  OUT)  :: ErrStat     !< Error status of the operation
       CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
-
+      
       
      ! TYPE(Morison_InitInputType)                       :: InitLocal   ! Local version of the input data for the geometry processing routine
 !      INTEGER, ALLOCATABLE                                          :: distribToNodeIndx(:)
@@ -4146,6 +4780,7 @@ IF (ALLOCATED(InitInp%JOutLst) ) &
       END IF     
       p%WaveTime     = InitInp%WaveTime
 
+
       
       CALL MOVE_ALLOC( InitInp%nodeInWater, p%nodeInWater )   
       
@@ -4156,10 +4791,10 @@ IF (ALLOCATED(InitInp%JOutLst) ) &
          ! We are storing the parameters in the DistribMarkers data structure instead of trying to hold this information within the DistribMesh.  But these two data structures
          ! must always be in sync.  For example, the 5th element of the DistribMarkers array must correspond to the 5th node in the DistribMesh data structure.
        
-      CALL CreateDistributedMesh( InitInp%WtrDens, InitInp%Gravity, InitInp%MSL2SWL, InitInp%WtrDpth, InitInp%NStepWave, InitInp%WaveAcc, InitInp%WaveDynP, &
+      CALL CreateDistributedMesh( Interval, InitInp%NStepSim, InitInp%WtrDens, InitInp%Gravity, InitInp%SeabedAngle, InitInp%MSL2SWL, InitInp%WtrDpth, InitInp%WaveDir, InitInp%WaveBreak, InitInp%NStepWave, InitInp%WaveTime, InitInp%WaveElev, InitInp%WaveVel, InitInp%WaveAcc, InitInp%WaveDynP, &
                                   p%NNodes, p%Nodes, p%nodeInWater, InitInp%NElements, InitInp%Elements, &
-                                  p%NDistribMarkers, u%DistribMesh, y%DistribMesh, p%distribToNodeIndx, p%D_F_I, &
-                                  p%D_F_B, p%D_F_DP, p%D_F_MG, p%D_F_BF, p%D_AM_M, p%D_AM_MG, p%D_AM_F, p%D_dragConst, p%elementWaterState, &                 ! 
+                                  p%NDistribMarkers, u%DistribMesh, y%DistribMesh, p%distribToNodeIndx, p%distribToBreakingIndx, p%D_F_I, &
+                                  p%D_F_B, p%D_F_BW, p%D_F_DP, p%D_F_MG, p%D_F_BF, p%D_AM_M, p%D_AM_MG, p%D_AM_F, p%D_dragConst, p%elementWaterState, &                 ! 
                                   InitOut%Morison_Rad,  ErrStat, ErrMsg )
                                     
                                  
@@ -4219,6 +4854,13 @@ IF (ALLOCATED(InitInp%JOutLst) ) &
          RETURN
       END IF      
       m%D_F_B = 0.0_ReKi
+      ALLOCATE ( m%D_F_BW(3,y%DistribMesh%Nnodes), STAT = ErrStat )
+      IF ( ErrStat /= ErrID_None ) THEN
+         ErrMsg  = ' Error allocating space for D_F_B array.'
+         ErrStat = ErrID_Fatal
+         RETURN
+      END IF      
+      m%D_F_BW = 0.0_ReKi
       ALLOCATE ( m%D_F_AM(6,y%DistribMesh%Nnodes), STAT = ErrStat )
       IF ( ErrStat /= ErrID_None ) THEN
          ErrMsg  = ' Error allocating space for D_F_AM array.'
@@ -4488,7 +5130,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, 
       CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
       REAL(ReKi)                                        :: F_D(6), F_DP(6), D_F_I(3), kvec(3), v(3),  vf(3), vrel(3), vmag
-      INTEGER                                           :: I, J, K, nodeIndx
+      INTEGER                                           :: I, J, K, nodeIndx, breakingIndx, simInc
       REAL(ReKi)                                        :: elementWaterState
       REAL(ReKi)                                        :: AllOuts(MaxMrsnOutputs)  ! TODO: think about adding to OtherState
       REAL(ReKi)                                        :: qdotdot(6) ,qdotdot2(3)     ! The structural acceleration of a mesh node
@@ -4509,6 +5151,9 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, 
       
          ! Compute outputs here:
       
+      ! Determine the simulation time increment for the breaking waves arrays
+      simInc = time / p%DT
+      
       ! We need to attach the distributed drag force (D_F_D), distributed inertial force (D_F_I), and distributed dynamic pressure force (D_F_DP) to the Misc type so that we don't need to
       ! allocate their data storage at each time step!  If we could make them static local variables (like in C) then we could avoid adding them to the OtherState datatype.  
       ! The same is true for the lumped drag (L_F_D) and the lumped dynamic pressure (L_F_DP)
@@ -4517,7 +5162,8 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, 
          
             ! Obtain the node index because WaveVel, WaveAcc, and WaveDynP are defined in the node indexing scheme, not the markers
          nodeIndx = p%distribToNodeIndx(J)
-          
+         breakingIndx = p%distribToBreakingIndx(J)
+         
             ! Determine in or out of water status for the element which this node is a part of.        
             ! NOTE: This will find the closest WaveTime index (wvIndx) which is has waveTime(wvIndx) > = Time.  If WaveDT = DT then waveTime(wvIndx) will equal Time
             ! For WaveMod = 6 or WaveMod = 5 WaveDT must equal DT for the returned value of elementWaterState to be meaningful, for other WaveMod, 
@@ -4541,6 +5187,9 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, 
             
             m%D_F_I(I,J) = elementWaterState * InterpWrappedStpReal ( REAL(Time, SiKi), p%WaveTime(:), p%D_F_I(:,I,J), &
                                     m%LastIndWave, p%NStepWave + 1       )
+            
+          !  m%D_F_BW(I,J) = elementWaterState * InterpWrappedStpReal ( REAL(Time, SiKi), p%WaveTime(:), p%D_F_BW(:,I,breakingIndx), &
+          !                          m%LastIndWave, p%NStepWave + 1       )
          END DO
          
             ! (k x vrel x k)
@@ -4562,9 +5211,14 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, 
                m%D_F_AM_MG(I,J) = -p%D_AM_MG(J)*u%DistribMesh%TranslationAcc(I,J)
                m%D_F_AM_F(:,J)  = -p%D_AM_F(J)*u%DistribMesh%TranslationAcc(I,J)
                m%D_F_AM(I,J)    = m%D_F_AM_M(I,J) + m%D_F_AM_MG(I,J) + m%D_F_AM_F(I,J)           
-               m%D_F_D(I,J) = elementWaterState * vmag*v(I) * p%D_dragConst(J)      
-               m%D_F_B(I,J) = elementWaterState * p%D_F_B(I,J)
-               y%DistribMesh%Force(I,J) = m%D_F_AM(I,J) + m%D_F_D(I,J)  + m%D_F_I(I,J) + m%D_F_B(I,J) +  p%D_F_MG(I,J) + p%D_F_BF(I,J)
+               m%D_F_D(I,J)     = elementWaterState * vmag*v(I) * p%D_dragConst(J)      
+               m%D_F_B(I,J)     = elementWaterState * p%D_F_B(I,J)
+               m%D_F_BW(I,J)    = p%D_F_BW(I,simInc,breakingIndx)  ! Breaking Wave impact force
+               IF (  m%D_F_BW(I,J) > 0.0 ) THEN
+                  CALL WrScr ( ' Increment : '//TRIM(Num2LStr(simInc))//', Node: '//TRIM(Num2LStr(J))//' has breaking wave force: '//TRIM(Num2LStr(m%D_F_BW(I,J))))
+               END IF
+               
+               y%DistribMesh%Force(I,J) = m%D_F_AM(I,J) + m%D_F_D(I,J)  + m%D_F_I(I,J) + m%D_F_B(I,J) +  p%D_F_MG(I,J) + p%D_F_BF(I,J) + m%D_F_BW(I,J)
             ELSE
                m%D_F_B(I,J) = elementWaterState * p%D_F_B(I,J)
                y%DistribMesh%Moment(I-3,J) =   m%D_F_B(I,J) + p%D_F_BF(I,J)     

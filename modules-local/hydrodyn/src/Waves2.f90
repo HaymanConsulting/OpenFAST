@@ -143,9 +143,9 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
       REAL(SiKi)                                         :: DynP_nm_plus         !< The value of \f$ \rho_\mathrm{w} B_{nm}^+ \omega_{\mu^+} \f$
 
          ! Tracking of joints for which we are doing calculations
-      REAL(SiKi),                            ALLOCATABLE :: WaveKinzi0Prime(:)   !< zi-coordinates for points where the incident wave kinematics will be computed before applying stretching; these are relative to the mean see level (meters)
+      REAL(SiKi),                            ALLOCATABLE :: WaveKinziPrime(:)    !< zi-coordinates for points where the incident wave kinematics will be computed before applying stretching; these are relative to the mean see level (meters)
       INTEGER(IntKi),                        ALLOCATABLE :: WaveKinPrimeMap(:)   !< Mapping function for the wave kinematics to calculate (based on depth)
-      INTEGER(IntKi)                                     :: NWaveKin0Prime       !< Number of points where the incident wave kinematics will be computed before applying stretching to the instantaneous free surface (-)
+      INTEGER(IntKi)                                     :: NWaveKinPrime        !< Number of points where the incident wave kinematics will be computed before applying stretching to the instantaneous free surface (-)
 
 
          ! Second order wave elevation calculations
@@ -312,7 +312,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
          ! Wave information we need to keep
 
-      p%NWaveElev    = InitInp%NWaveElev
+      p%NWaveElevOut = InitInp%NWaveElevOut
       p%NStepWave    = InitInp%NStepWave
       p%NStepWave2   = InitInp%NStepWave2
 
@@ -359,43 +359,38 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
       ! Setup WaveKin0Prime -- points from the mesh that are passed in
       !--------------------------------------------------------------------------------
 
-      !> @note Wave stretching will need to be incorporated here when we add it to
-      !!       the waves module.
-
-      ! Determine the number of, NWaveKin0Prime, and the zi-coordinates for,
-      !   WaveKinzi0Prime(:), points where the incident wave kinematics will be
-      !   computed before applying stretching to the instantaneous free surface.
+      ! Determine the number of, NWaveKinPrime, and the zi-coordinates for,
+      !   WaveKinziPrime(:), points where the incident wave kinematics will be
+      !   computed.
       !   The locations are relative to the mean see level.  These depend on
       !   which incident wave kinematics stretching method is being used:
 
 
-     ! SELECT CASE ( InitInp%WaveStMod )  ! Which model are we using to extrapolate the incident wave kinematics to the instantaneous free surface?
-
-     ! CASE ( 0 )                 ! None=no stretching.
 
 
-         ! Since we have no stretching, NWaveKin0Prime and WaveKinzi0Prime(:) are
+         !   If we have no stretching, NWaveKinPrime and WaveKinziPrime(:) are
          !   equal to the number of, and the zi-coordinates for, the points in the
          !   WaveKinzi(:) array between, and including, -WtrDpth and 0.0.
 
-         ! Determine NWaveKin0Prime here:
+         ! Determine NWaveKinPrime here:
+         IF ( InitInp%WaveStMod == 0 ) THEN
+            NWaveKinPrime = 0
+            DO J = 1,InitInp%NWaveKin   ! Loop through all mesh points  where the incident wave kinematics will be computed
+                  ! NOTE: We test to 0 instead of MSL2SWL because the locations of WaveKinzi and WtrDpth have already been adjusted using MSL2SWL
+               IF (    InitInp%WaveKinzi(J) >= -InitInp%WtrDpth .AND. InitInp%WaveKinzi(J) <= 0 )  THEN
+                  NWaveKinPrime = NWaveKinPrime + 1
+               END IF
+            END DO                ! J - All Morison nodes where the incident wave kinematics will be computed
+         ELSE
+            NWaveKinPrime = InitInp%NWaveKin  ! For wave stretching we are calculating the kinematics at all mesh nodes.
+         END IF
+         
+         ! ALLOCATE the WaveKinziPrime(:) array and compute its elements here:
 
-         NWaveKin0Prime = 0
-         DO J = 1,InitInp%NWaveKin   ! Loop through all mesh points  where the incident wave kinematics will be computed
-               ! NOTE: We test to 0 instead of MSL2SWL because the locations of WaveKinzi and WtrDpth have already been adjusted using MSL2SWL
-            IF (    InitInp%WaveKinzi(J) >= -InitInp%WtrDpth .AND. InitInp%WaveKinzi(J) <= 0 )  THEN
-               NWaveKin0Prime = NWaveKin0Prime + 1
-            END IF
-         END DO                ! J - All Morison nodes where the incident wave kinematics will be computed
+         ALLOCATE ( WaveKinziPrime(NWaveKinPrime) , STAT=ErrStatTmp )
+         IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array WaveKinziPrime.',ErrStat,ErrMsg,'Waves2_Init')
 
-
-
-         ! ALLOCATE the WaveKinzi0Prime(:) array and compute its elements here:
-
-         ALLOCATE ( WaveKinzi0Prime(NWaveKin0Prime) , STAT=ErrStatTmp )
-         IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array WaveKinzi0Prime.',ErrStat,ErrMsg,'Waves2_Init')
-
-         ALLOCATE ( WaveKinPrimeMap(NWaveKin0Prime) , STAT=ErrStatTmp )
+         ALLOCATE ( WaveKinPrimeMap(NWaveKinPrime) , STAT=ErrStatTmp )
          IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array WaveKinPrimeMap.',ErrStat,ErrMsg,'Waves2_Init')
 
          IF ( ErrStat >= AbortErrLev ) THEN
@@ -405,33 +400,27 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
 
          I = 1
+         
+         ! For wave stretching we are simply going to change the WaveKinziPrime value to be equal to 0.0 for all locations above the SWL, i.e., z> 0 !!!
+         ! Then we will calculate the kinematics for all NWaveKin locations, not just the NWaveKinPrime locations!!!
+         ! That means we can set NWaveKinPrime = NWaveKin...
+ 
 
          DO J = 1,InitInp%NWaveKin ! Loop through all points where the incident wave kinematics will be computed without stretching
                ! NOTE: We test to 0 instead of MSL2SWL because the locations of WaveKinzi and WtrDpth have already been adjusted using MSL2SWL
+            
             IF (    InitInp%WaveKinzi(J) >= -InitInp%WtrDpth .AND. InitInp%WaveKinzi(J) <= 0 )  THEN
-
-               WaveKinzi0Prime(I) =  InitInp%WaveKinzi(J)
+               WaveKinziPrime(I)  =  InitInp%WaveKinzi(J)
                WaveKinPrimeMap(I) =  J
                I = I + 1
-
+            ELSE IF ( InitInp%WaveStMod > 0 ) THEN
+               WaveKinziPrime(I)  = 0.0_ReKi
+               WaveKinPrimeMap(I) =  J
+               I = I + 1
             END IF
 
          END DO                   ! J - All points where the incident wave kinematics will be computed without stretching
-
-
-
-      !CASE ( 1, 2 )              ! Vertical stretching or extrapolation stretching.
-      !   CALL SetErrStat(ErrID_Fatal,' Vertical and extrapolation stretching not supported in second order calculations.',ErrStat,ErrMsg,'Waves2_Init')
-      !
-      !
-      !CASE ( 3 )                 ! Wheeler stretching.
-      !   CALL SetErrStat(ErrID_Fatal,' Wheeler stretching not supported in second order calculations.',ErrStat,ErrMsg,'Waves2_Init')
-      !
-      !CASE DEFAULT
-      !   CALL SetErrStat(ErrID_Fatal,' Stretching is not supported in the second order waves kinematics calculations.',ErrStat,ErrMsg,'Waves2_Init')
-      !
-      !
-      !ENDSELECT
+    
 
 
       IF ( ErrStat >= AbortErrLev ) THEN
@@ -447,8 +436,13 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
       !--------------------------------------------------------------------------------
 
 
-      ALLOCATE ( p%WaveElev2 (0:InitInp%NStepWave,InitInp%NWaveElev  ), STAT=ErrStatTmp )
-      IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array p%WaveElev2.', ErrStat,ErrMsg,'Waves2_Init')
+      ALLOCATE ( p%WaveElevOut2 (0:InitInp%NStepWave,InitInp%NWaveElevOut  ), STAT=ErrStatTmp )
+      IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array p%WaveElevOut2.', ErrStat,ErrMsg,'Waves2_Init')
+      
+      IF ( InitInp%WaveStMod > 0 ) THEN
+         ALLOCATE ( p%WaveElev2St (0:InitInp%NStepWave,InitInp%NWaveKin  ), STAT=ErrStatTmp )
+         IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array p%WaveElev2St.', ErrStat,ErrMsg,'Waves2_Init')
+      END IF 
 
       ALLOCATE ( InitOut%WaveVel2D  (0:InitInp%NStepWave,InitInp%NWaveKin,3), STAT=ErrStatTmp )
       IF (ErrStatTmp /= 0) CALL SetErrStat(ErrID_Fatal,'Cannot allocate array InitOut%WaveVel2D.',  ErrStat,ErrMsg,'Waves2_Init')
@@ -476,10 +470,10 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
 
          !Initialize the output arrays to zero.  We will only fill it in for the points we calculate.
-      p%WaveElev2          =  0.0_SiKi
-      InitOut%WaveVel2D    =  0.0_SiKi
-      InitOut%WaveAcc2D    =  0.0_SiKi
-      InitOut%WaveDynP2D   =  0.0_SiKi
+      p%WaveElevOut2     =  0.0_SiKi
+      InitOut%WaveVel2D  =  0.0_SiKi
+      InitOut%WaveAcc2D  =  0.0_SiKi
+      InitOut%WaveDynP2D =  0.0_SiKi
       InitOut%WaveVel2S  =  0.0_SiKi
       InitOut%WaveAcc2S  =  0.0_SiKi
       InitOut%WaveDynP2S =  0.0_SiKi
@@ -614,14 +608,14 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
             !--------------------------------------------------------------------------------
 
             ! Step through the requested points
-         DO I=1,InitInp%NWaveElev
+         DO I=1,InitInp%NWaveElevOut
             CALL WaveElevTimeSeriesAtXY_Diff(InitInp%WaveElevxi(I), InitInp%WaveElevyi(I), TmpTimeSeries, ErrStatTmp, ErrMsgTmp )
-            CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to InitOut%WaveElev.',ErrStat,ErrMsg,'Waves2_Init')
+            CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to InitOut%WaveElevOut.',ErrStat,ErrMsg,'Waves2_Init')
             IF ( ErrStat >= AbortErrLev ) THEN
                CALL CleanUp()
                RETURN
             END IF
-            p%WaveElev2(:,I) = TmpTimeSeries(:)
+            p%WaveElevOut2(:,I) = TmpTimeSeries(:)
          ENDDO    ! Wave elevation points requested
 
 
@@ -639,6 +633,20 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
             ENDDO
          ENDIF
 
+         IF (InitInp%WaveStMod > 0 ) THEN
+            
+            DO I=1,InitInp%NWaveKin
+               CALL WaveElevTimeSeriesAtXY_Diff(InitInp%WaveKinxi(I), InitInp%WaveKinyi(I), TmpTimeSeries, ErrStatTmp, ErrMsgTmp )
+               CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to p%WaveElev2St.',ErrStat,ErrMsg,'Waves2_Init')
+               IF ( ErrStat >= AbortErrLev ) THEN
+                  CALL CleanUp()
+                  RETURN
+               END IF
+               p%WaveElev2St(:,I) = TmpTimeSeries(:)
+            ENDDO    ! Wave elevation points requested
+            
+         END IF
+         
 
 
          !--------------------------------------------------------------------------------
@@ -646,8 +654,8 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
          !--------------------------------------------------------------------------------
 
 
-            ! NWaveKin0Prime loop start
-         DO I=1,NWaveKin0Prime
+            ! NWaveKinPrime loop start
+         DO I=1,NWaveKinPrime
 
 
                ! Reset the \f$ H_{\mu^-} \f$ terms to zero before calculating.
@@ -697,11 +705,11 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
 
                         ! Get value for \f$ B^- \f$ for the n,m index pair
-                     B_minus  =  TransFuncB_minus( n, m, k_n, k_m, WaveKinzi0Prime(I) )
+                     B_minus  =  TransFuncB_minus( n, m, k_n, k_m, WaveKinziPrime(I) )
 
 
                         !> Calculate \f$ U^- \f$ terms for the velocity calculations (\f$B^-\f$ provided by waves2::transfuncb_minus)
-                        ! NOTE: InitInp%WtrDpth + WaveKinzi0Prime(I) is the height above the ocean floor
+                        ! NOTE: InitInp%WtrDpth + WaveKinziPrime(I) is the height above the ocean floor
                         !> * \f$ _x{U}_{nm}^- = B_{nm}^- \left(k_n \cos \theta_n - k_m \cos \theta_m \right) \f$
                      Ux_nm_minus = B_minus * ( k_n * COS( D2R*InitInp%WaveDirArr(n) ) - k_m * COS( D2R*InitInp%WaveDirArr(m) ) )
 
@@ -709,7 +717,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
                      Uy_nm_minus = B_minus * ( k_n * SIN( D2R*InitInp%WaveDirArr(n) ) - k_m * SIN( D2R*InitInp%WaveDirArr(m) ) )
 
                         !> * \f$ _z{U}_{nm}^- = \imath B_{nm}^- k_{nm} \tanh \left( k_{nm} ( h + z ) \right) \f$
-                     Uz_nm_minus = ImagNmbr * B_minus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinzi0Prime(I) ) )
+                     Uz_nm_minus = ImagNmbr * B_minus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinziPrime(I) ) )
 
 
                         !> Acceleration calculations
@@ -823,7 +831,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
             InitOut%WaveDynP2D(InitInp%NStepWave,WaveKinPrimeMap(I))    =  WaveDynP2Diff(0)
 
 
-         ENDDO    ! I=1,NWaveKin0Prime loop end
+         ENDDO    ! I=1,NWaveKinPrime loop end
 
 
             ! Deallocate working arrays.
@@ -985,15 +993,15 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
          !--------------------------------------------------------------------------------
 
              ! Step through the requested points
-         DO I=1,InitInp%NWaveElev
+         DO I=1,InitInp%NWaveElevOut
             CALL WaveElevTimeSeriesAtXY_Sum(InitInp%WaveElevxi(I), InitInp%WaveElevyi(I), TmpTimeSeries, ErrStatTmp, ErrMsgTmp )
-            CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to InitOut%WaveElev.',ErrStat,ErrMsg,'Waves2_Init')
+            CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to InitOut%WaveElevOut.',ErrStat,ErrMsg,'Waves2_Init')
             IF ( ErrStat >= AbortErrLev ) THEN
                CALL CleanUp()
                RETURN
             END IF
                ! Add to the series since the difference is already included
-            p%WaveElev2(:,I) = p%WaveElev2(:,I) + TmpTimeSeries(:)
+            p%WaveElevOut2(:,I) = p%WaveElevOut2(:,I) + TmpTimeSeries(:)
          ENDDO    ! Wave elevation points requested
 
 
@@ -1012,13 +1020,26 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
             ENDDO
          ENDIF
 
+         IF (InitInp%WaveStMod > 0 ) THEN
+            
+            DO I=1,InitInp%NWaveKin
+               CALL WaveElevTimeSeriesAtXY_Sum(InitInp%WaveKinxi(I), InitInp%WaveKinyi(I), TmpTimeSeries, ErrStatTmp, ErrMsgTmp )
+               CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to p%WaveElev2St.',ErrStat,ErrMsg,'Waves2_Init')
+               IF ( ErrStat >= AbortErrLev ) THEN
+                  CALL CleanUp()
+                  RETURN
+               END IF
+               p%WaveElev2St(:,I) = p%WaveElev2St(:,I) + TmpTimeSeries(:)
+            ENDDO    ! Wave elevation points requested
+            
+         END IF
 
 
          !--------------------------------------------------------------------------------
          !> ## Calculate the second order velocity, acceleration, and pressure corrections for all joints below surface. ##
          !--------------------------------------------------------------------------------
-            ! NWaveKin0Prime loop start
-         DO I=1,NWaveKin0Prime
+            ! NWaveKinPrime loop start
+         DO I=1,NWaveKinPrime
 
 
                ! Reset the \f$ H_{\mu^+} \f$ terms to zero before calculating.
@@ -1083,11 +1104,11 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
 
                      ! Get value for \f$ B+ \f$ for the n,m index pair
-                  B_plus  =  TransFuncB_plus( n, n, k_n, k_n, WaveKinzi0Prime(I) )
+                  B_plus  =  TransFuncB_plus( n, n, k_n, k_n, WaveKinziPrime(I) )
 
 
                      !> Calculate \f$ U^+ \f$ terms for the velocity calculations (\f$B^+\f$ provided by waves2::transfuncb_plus)
-                     ! NOTE: InitInp%WtrDpth + WaveKinzi0Prime(I) is the height above the ocean floor
+                     ! NOTE: InitInp%WtrDpth + WaveKinziPrime(I) is the height above the ocean floor
                      !> * \f$ _x{U}_{nn}^+ = B_{nn}^+ 2 k_n \cos \theta_n \f$
                   Ux_nm_plus = B_plus * 2.0_SiKi * k_n * COS( D2R*InitInp%WaveDirArr(n) )
 
@@ -1095,7 +1116,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
                   Uy_nm_plus = B_plus * 2.0_SiKi * k_n * SIN( D2R*InitInp%WaveDirArr(n) )
 
                      !> * \f$ _z{U}_{nn}^+ = \imath B_{nn}^+ k_{nn} \tanh \left( k_{nn} ( h + z ) \right) \f$
-                  Uz_nm_plus = ImagNmbr * B_plus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinzi0Prime(I) ) )
+                  Uz_nm_plus = ImagNmbr * B_plus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinziPrime(I) ) )
 
 
                      !> Acceleration calculations
@@ -1185,11 +1206,11 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
 
 
                         ! Get value for \f$ B+ \f$ for the n,m index pair
-                     B_plus  =  TransFuncB_plus( n, m, k_n, k_m, WaveKinzi0Prime(I) )
+                     B_plus  =  TransFuncB_plus( n, m, k_n, k_m, WaveKinziPrime(I) )
 
 
                         !> Calculate \f$ U^+ \f$ terms for the velocity calculations (\f$B^+\f$ provided by waves2::transfuncb_plus)
-                        ! NOTE: InitInp%WtrDpth + WaveKinzi0Prime(I) is the height above the ocean floor
+                        ! NOTE: InitInp%WtrDpth + WaveKinziPrime(I) is the height above the ocean floor
                         !> * \f$ _x{U}_{nm}^+ = B_{nm}^+ \left(k_n \cos \theta_n + k_m \cos \theta_m \right) \f$
                      Ux_nm_plus = B_plus * ( k_n * COS( D2R*InitInp%WaveDirArr(n) ) + k_m * COS( D2R*InitInp%WaveDirArr(m) ) )
 
@@ -1197,7 +1218,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
                      Uy_nm_plus = B_plus * ( k_n * SIN( D2R*InitInp%WaveDirArr(n) ) + k_m * SIN( D2R*InitInp%WaveDirArr(m) ) )
 
                         !> * \f$ _z{U}_{nm}^+ = \imath B_{nm}^+ k_{nm} \tanh \left( k_{nm} ( h + z ) \right) \f$
-                     Uz_nm_plus = ImagNmbr * B_plus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinzi0Prime(I) ) )
+                     Uz_nm_plus = ImagNmbr * B_plus * k_nm * tanh( k_nm * ( InitInp%WtrDpth + WaveKinziPrime(I) ) )
 
 
                         !> Acceleration calculations
@@ -1328,7 +1349,7 @@ SUBROUTINE Waves2_Init( InitInp, u, p, x, xd, z, OtherState, y, misc, Interval, 
             InitOut%WaveDynP2S(InitInp%NStepWave,WaveKinPrimeMap(I))    =  InitOut%WaveDynP2S(0,WaveKinPrimeMap(I))
 
 
-         ENDDO    ! I=1,NWaveKin0Prime loop end
+         ENDDO    ! I=1,NWaveKinPrime loop end
 
 
             ! Deallocate working arrays.
@@ -2283,7 +2304,7 @@ SUBROUTINE Waves2_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, E
 
          ! Local Variables:
       INTEGER(IntKi)                                     :: I                          ! Generic index
-      REAL(SiKi)                                         :: WaveElev2Temp(p%NWaveElev)
+      REAL(SiKi)                                         :: WaveElevOut2Temp(p%NWaveElevOut)
       REAL(ReKi)                                         :: AllOuts(MaxWaves2Outputs)
 
  
@@ -2298,17 +2319,17 @@ SUBROUTINE Waves2_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, E
 
          ! Abort if the Waves2 module did not calculate anything 
 
-      IF ( .NOT. ALLOCATED ( p%WaveElev2 ) )  RETURN
+      IF ( .NOT. ALLOCATED ( p%WaveElevOut2 ) )  RETURN
       IF ( p%NumOuts < 1 ) RETURN
 
 
-      DO I=1,p%NWaveElev
-         WaveElev2Temp(I)  = InterpWrappedStpReal ( REAL(Time, SiKi), p%WaveTime(:), p%WaveElev2(:,I), &
+      DO I=1,p%NWaveElevOut
+         WaveElevOut2Temp(I)  = InterpWrappedStpReal ( REAL(Time, SiKi), p%WaveTime(:), p%WaveElevOut2(:,I), &
                                                      m%LastIndWave, p%NStepWave + 1       )
       ENDDO
 
          ! Map the calculated results into the AllOuts Array
-      CALL Wvs2Out_MapOutputs(Time, y, p%NWaveElev, WaveElev2Temp, AllOuts, ErrStat, ErrMsg)
+      CALL Wvs2Out_MapOutputs(Time, y, p%NWaveElevOut, WaveElevOut2Temp, AllOuts, ErrStat, ErrMsg)
 
 
 

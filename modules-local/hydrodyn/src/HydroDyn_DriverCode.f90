@@ -171,10 +171,8 @@ PROGRAM HydroDynDriver
       
       CALL get_command_argument(1, drvrFilename)
       CALL ReadDriverInputFile( drvrFilename, drvrInitInp, ErrStat, ErrMsg )
-      IF ( ErrStat /= 0 ) THEN
-         CALL WrScr( ErrMsg )
-         STOP
-      END IF
+      call CheckError()
+      
       InitInData%Gravity      = drvrInitInp%Gravity
       InitInData%UseInputFile = .TRUE. 
       InitInData%InputFile    = drvrInitInp%HDInputFile
@@ -186,7 +184,6 @@ PROGRAM HydroDynDriver
    call date_and_time ( Values=StrtTime )                               ! Let's time the whole simulation
    call cpu_time ( UsrTime1 )                                           ! Initial time (this zeros the start time when used as a MATLAB function)
    SttsTime = 1.0 ! seconds
-   
      ! figure out how many time steps we should go before writing screen output:      
    n_SttsTime = MAX( 1, NINT( SttsTime / drvrInitInp%TimeInterval ) ) ! this may not be the final TimeInterval, though!!! GJH 8/14/14
     
@@ -206,8 +203,8 @@ PROGRAM HydroDynDriver
       
          ! Open the WAMIT inputs data file
       CALL GetNewUnit( UnWAMITInp ) 
-      CALL OpenFInpFile ( UnWAMITInp, drvrInitInp%WAMITInputsFile, ErrStat, ErrMsg ) 
-         IF (ErrStat >=AbortErrLev) STOP
+      CALL OpenFOutFile ( UnWAMITInp, drvrInitInp%WAMITInputsFile, ErrStat, ErrMsg ) 
+      call CheckError()
       
       
       ALLOCATE ( WAMITin(drvrInitInp%NSteps, 19), STAT = ErrStat )
@@ -236,8 +233,8 @@ PROGRAM HydroDynDriver
       
          ! Open the Morison inputs data file
       CALL GetNewUnit( UnMorisonInp )
-      CALL OpenFInpFile ( UnMorisonInp, drvrInitInp%MorisonInputsFile, ErrStat, ErrMsg ) 
-         IF (ErrStat >=AbortErrLev) STOP
+      CALL OpenFOutFile ( UnMorisonInp, drvrInitInp%MorisonInputsFile, ErrStat, ErrMsg ) 
+      call CheckError()
       
       
       ALLOCATE ( MorisonIn(drvrInitInp%NSteps, 19), STAT = ErrStat )
@@ -266,12 +263,12 @@ PROGRAM HydroDynDriver
       ! Setup the arrays for the wave elevation timeseries if requested by the driver input file
    IF ( drvrInitInp%WaveElevSeriesFlag ) THEN
       ALLOCATE ( InitInData%WaveElevXY(2,drvrInitInp%WaveElevNX*drvrInitInp%WaveElevNY), STAT=ErrStat )
-      IF ( ErrStat >= ErrID_Fatal ) THEN
+      IF ( ErrStat /= 0 ) THEN
+         ErrMsg  = '  Error allocating space for WaveElevXY array.'
+         ErrStat = ErrID_FATAL
          CALL HydroDyn_End( u(1), p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
-         IF ( ErrStat /= ErrID_None ) THEN
-            CALL WrScr( ErrMsg )     
-         END IF
-         STOP
+         call CheckError()
+         
       END IF
 
          ! Set the values
@@ -292,31 +289,31 @@ PROGRAM HydroDynDriver
          ! Initialize the module
    Interval = drvrInitInp%TimeInterval
    CALL HydroDyn_Init( InitInData, u(1), p,  x, xd, z, OtherState, y, m, Interval, InitOutData, ErrStat, ErrMsg )
-   if (errStat >= AbortErrLev) then
-         ! Clean up and exit
-      call HD_DvrCleanup()
-   end if
+   call CheckError()
 
    IF ( Interval /= drvrInitInp%TimeInterval) THEN
-      CALL WrScr('The HydroDyn Module attempted to change timestep interval, but this is not allowed.  The HydroDyn Module must use the Driver Interval.')
-      call HD_DvrCleanup() 
+      ErrMsg  = 'The HydroDyn Module attempted to change timestep interval, but this is not allowed.  The HydroDyn Module must use the Driver Interval.'
+      ErrStat = ErrID_FATAL
+      call CheckError()
       
    END IF
 
 
       ! Write the gridded wave elevation data to a file
 
-   IF ( drvrInitInp%WaveElevSeriesFlag )     CALL WaveElevGrid_Output  (drvrInitInp, InitInData, InitOutData, p, ErrStat, ErrMsg)
-   if (errStat >= AbortErrLev) then
-         ! Clean up and exit
-      call HD_DvrCleanup()
-   end if
+   IF ( drvrInitInp%WaveElevSeriesFlag )     THEN
+      CALL WaveElevGrid_Output  (drvrInitInp, InitInData, InitOutData, p, ErrStat, ErrMsg)
+      call CheckError()
+   END IF
+   
 
    
       ! Destroy initialization data
 
    CALL HydroDyn_DestroyInitInput(  InitInData,  ErrStat, ErrMsg )
+   call CheckError()
    CALL HydroDyn_DestroyInitOutput( InitOutData, ErrStat, ErrMsg )
+   call CheckError()
    
    
       ! Set any steady-state inputs, once before the time-stepping loop
@@ -440,20 +437,14 @@ PROGRAM HydroDynDriver
          ! Calculate outputs at n
 
       CALL HydroDyn_CalcOutput( Time, u(1), p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
-      if (errStat >= AbortErrLev) then
-            ! Clean up and exit
-         call HD_DvrCleanup()
-      end if
+      call CheckError()
 
       
       
          ! Get state variables at next step: INPUT at step n, OUTPUT at step n + 1
 
       CALL HydroDyn_UpdateStates( Time, n, u, InputTime, p, x, xd, z, OtherState, m, ErrStat, ErrMsg )
-      if (errStat >= AbortErrLev) then
-            ! Clean up and exit
-         call HD_DvrCleanup()
-      end if
+      call CheckError()
       
    
       IF ( MOD( n + 1, n_SttsTime ) == 0 ) THEN
@@ -1159,6 +1150,21 @@ subroutine print_help()
 
 end subroutine print_help
 
+
+!................................   
+   subroutine CheckError()
+   
+      if (ErrStat /= ErrID_None) then
+         call WrScr(TRIM(ErrMsg))
+         
+         if (ErrStat >= AbortErrLev) then
+            call HD_DvrCleanup()
+         end if
+         
+      end if
+         
+   end subroutine CheckError
+!................................   
 
 !----------------------------------------------------------------------------------------------------------------------------------
 

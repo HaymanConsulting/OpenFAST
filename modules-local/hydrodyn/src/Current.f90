@@ -101,17 +101,23 @@ SUBROUTINE Calc_Current( InitInp, z, h , DirRoot, CurrVxi, CurrVyi )
 
 
          ! Local Variables:
-
+      REAL(ReKi)                           :: zLocal          ! Local version of z, modified based on the wave stretching (m)
       REAL(ReKi)                           :: CurrSSV         ! Magnitude of sub -surface current velocity at elevation z (m/s)
       REAL(ReKi)                           :: CurrNSV         ! Magnitude of near-surface current velocity at elevation z (m/s)
 
-
-
+         ! If we are using wave stretching then set the values above z = 0 to the current at z = 0
+      IF ( z > 0.0 .AND. Initinp%WaveStMod > 0 ) THEN
+         zLocal = 0.0_ReKi
+      ELSE
+         zLocal = z
+      END IF
+      
          ! If elevation z lies between the seabed and the mean sea level, compute the
          !   xi- and yi-components of the current (which depends on which current
          !   profile model is selected), else set CurrVxi and CurrVyi to zero:
-
-      IF ( ( z < -h ) .OR. ( z > 0.0 ) )  THEN  ! .TRUE. if elevation z lies below the seabed or above mean sea level (exclusive)
+      
+      
+      IF ( ( zLocal < -h ) .OR. ( zLocal > 0.0 ) )  THEN  ! .TRUE. if elevation z lies below the seabed or above mean sea level (exclusive)
 
 
             CurrVxi = 0.0  ! Set both the xi- and yi-direction
@@ -131,8 +137,8 @@ SUBROUTINE Calc_Current( InitInp, z, h , DirRoot, CurrVxi, CurrVyi )
 
          CASE ( 1 )              ! Standard (using inputs from PtfmFile).
 
-            CurrSSV =      InitInp%CurrSSV0*( ( z + h                      )/h                      )**(1.0/7.0)
-            CurrNSV = MAX( InitInp%CurrNSV0*( ( z + InitInp%CurrNSRef )/InitInp%CurrNSRef )           , 0.0_SiKi )
+            CurrSSV =      InitInp%CurrSSV0*( ( zLocal + h                      )/h                      )**(1.0/7.0)
+            CurrNSV = MAX( InitInp%CurrNSV0*( ( zLocal + InitInp%CurrNSRef )/InitInp%CurrNSRef )           , 0.0_SiKi )
 
             CurrVxi = InitInp%CurrDIV*COS( D2R*InitInp%CurrDIDir ) + CurrSSV*COS( D2R*InitInp%CurrSSDir ) + &
                                    CurrNSV*COS( D2R*InitInp%CurrNSDir )
@@ -143,7 +149,7 @@ SUBROUTINE Calc_Current( InitInp, z, h , DirRoot, CurrVxi, CurrVyi )
 
          CASE ( 2 )              ! User-defined current profile model.
 
-            CALL UserCurrent ( z, h, DirRoot, CurrVxi, CurrVyi )
+            CALL UserCurrent ( real(zLocal,SiKi), h, DirRoot, CurrVxi, CurrVyi )
 
          ENDSELECT
 
