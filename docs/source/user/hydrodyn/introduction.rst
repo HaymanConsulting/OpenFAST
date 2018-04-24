@@ -76,10 +76,10 @@ quadratic) to the system to represent this effect.
 When HydroDyn is coupled to OpenFAST, HydroDyn receives the position, 
 orientation, velocities, and accelerations of the (rigid or flexible) 
 substructure at each coupling time step and then computes the hydrodynamic 
-loads and returns them back to OpenFAST. At this time, FAST’s ElastoDyn 
+loads and returns them back to OpenFAST. At this time, OpenFAST’s ElastoDyn 
 structural-dynamics module assumes for a floating platform that the 
 substructure (floating platform) is a six degree-of-freedom (DOF) rigid 
-body. For fixed-bottom offshore wind turbines, FAST’s SubDyn module 
+body. For fixed-bottom offshore wind turbines, OpenFAST’s SubDyn module 
 allows for structural flexibility of multi-member substructures and 
 the coupling to HydroDyn includes hydro-elastic effects.
 

@@ -155,7 +155,7 @@ Results File
 --------------
 The HydroDyn time-series results are written to a text-based file with the naming 
 convention ``OutRootName.HD.out`` when ``OutSwtch`` is set to either 1 or 3. If HydroDyn is 
-coupled to FAST and ``OutSwtch`` is set to 2 or 3, then FAST will generate a master results 
+coupled to OpenFAST and ``OutSwtch`` is set to 2 or 3, then OpenFAST will generate a master results 
 file that includes the HydroDyn results. The results are in table format, where each 
 column is a data channel (the first column always being the simulation time), and each 
 row corresponds to a simulation output time step. The data channels are specified in 
