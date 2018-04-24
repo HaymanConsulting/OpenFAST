@@ -137,7 +137,7 @@ For example, if you want axial effects at a marine-growth boundary, you must exp
 Distributed Inertia, Added Mass, Buoyancy, Marine-Growth Weight, and Marine-Growth Mass Inertia Loads
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 These loads are generated at a node as long as ``PropPot`` = FALSE, the Z-coordinate is in the range 
-[–``WtrDpth``,``MSL2SWL``], and the element the node is connected to is in the water. When ``WaveMod`` = 6, 
+[–``WtrDpth``, ``MSL2SWL``], and the element the node is connected to is in the water. When ``WaveMod`` = 6, 
 the domain is determined by the use of numeric values and nonnumeric strings in the wave data input files.
 
 Distributed Viscous Drag Loads
@@ -154,18 +154,18 @@ These loads are generated at a node as long as the Z-coordinate is in the range
 Lumped Added Mass, Inertia, and Buoyancy Loads
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 These loads are generated at a node as long as ``PropPot`` = FALSE and the Z-coordinate is in the range 
-[–``WtrDpth``,``MSL2SWL``]. When ``WaveMod`` = 6, the domain is determined by the use of numeric values 
+[–``WtrDpth``, ``MSL2SWL``]. When ``WaveMod`` = 6, the domain is determined by the use of numeric values 
 and nonnumeric strings in the wave data input files.
 
 Lumped Axial Drag Loads
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-These loads are generated at a node as long as the Z-coordinate is in the range [–``WtrDpth``,``MSL2SWL``]. 
+These loads are generated at a node as long as the Z-coordinate is in the range [–``WtrDpth``, ``MSL2SWL``]. 
 When ``WaveMod`` = 6, the domain is determined by the use of numeric values and nonnumeric strings in the 
 wave data input files.
 
 Lumped Filled Buoyancy Loads
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-These loads are generated at a node as long as the Z-coordinate is in the range [–``WtrDpth``,``FillFSLoc``]
+These loads are generated at a node as long as the Z-coordinate is in the range [–``WtrDpth``, ``FillFSLoc``]
 
 Strip-Theory Hydrodynamic Coefficients
 ---------------------------------------
@@ -300,7 +300,7 @@ the displaced position of the substructure. While the change in buoyancy is like
 fixed-bottom systems, for floating systems modeled using a strip-theory solution, the change in buoyancy 
 with displacement is likely important and should not be neglected. In this latter case, the user should 
 manually calculate the 6x6 linear hydrostatic restoring matrix associated with the strip-theory members 
-and enter this as the additional linear restoring (stiffness) matrix, AddCLin. (The static buoyancy of 
+and enter this as the additional linear restoring (stiffness) matrix, ``AddCLin``. (The static buoyancy of 
 the strip-theory members is automatically calculated and applied within HydroDyn.)
 
 In its most general form, the 6x6 linear hydrostatic restoring matrix of a floating platform is given by the equation below.
@@ -355,8 +355,7 @@ For the first-order potential-flow solution, HydroDyn requires data from the WAM
 .1, .3, and .hst extensions. When creating these files, one should keep in mind:
 
 • The .1 file must contain the 6×6 added-mass matrix at infinite frequency (period = zero). Additionally, the .1 file must contain the 6×6 damping matrix over a large range from low frequency to high frequency (the damping should approach zero at both ends of the range). A range of 0.0 to 5.0 rad/s with a discretization of 0.05 rad/s is suggested.
-• The .3 file must contain the first-order wave-excitation (diffraction) loads (3 forces and 3 moments) per unit wave amplitude across frequencies and directions where there is wave energy. A range of 0.0 to 5.0 rad/s with a discretization of 0.05 rad/s is suggested and the direction should be specified across the desired range—the full direction range of (-180
-to 180] degrees with a discretization of 10 degrees is suggested. While the .3 file contains both the magnitude/phase and real/imaginary components of the first-order wave-excitation loads, only the latter are used by HydroDyn.
+• The .3 file must contain the first-order wave-excitation (diffraction) loads (3 forces and 3 moments) per unit wave amplitude across frequencies and directions where there is wave energy. A range of 0.0 to 5.0 rad/s with a discretization of 0.05 rad/s is suggested and the direction should be specified across the desired range—the full direction range of (-180 to 180] degrees with a discretization of 10 degrees is suggested. While the .3 file contains both the magnitude/phase and real/imaginary components of the first-order wave-excitation loads, only the latter are used by HydroDyn.
 • The .hst file should account for the restoring provided by buoyancy, but not the restoring provided by body mass or moorings. (The hydrostatic file is not frequency dependent.) An important thing to keep in mind is that the pitch and roll restoring of a floating body depends on the vertical distance between the center of buoyancy and center of mass of the body. In WAMIT, the vertical center of gravity (VCG) is used to determine the pitch and roll restoring associated with platform weight, and WAMIT will include these effects in the restoring matrix that it outputs (the .hst file). However, the ElastoDyn module of FAST intrinsically accounts for the platform weight’s influence on the pitch and roll restoring if the platform weight and center-of-mass location are defined appropriately. To avoid double booking these terms, it is important to neglect these terms in WAMIT. This can be achieved by setting VCG to zero when solving the first-order problem in WAMIT.
 
 The second-order WAMIT files only need to pre-calculated if a second-order potential-flow option 
@@ -369,8 +368,7 @@ When creating any of these files, one should keep in mind:
 
 • The second-order frequency-domain solution is dependent on first-order body motions, whose accuracy is impacted by properly setting the 6×6 rigid-body mass matrix and center of gravity of the complete floating wind system and the 6×6 mooring system restoring matrix. So, while the body center of gravity and mooring stiffness should be zeroed when creating the first-order WAMIT files, they should not be zeroed when creating the second-order WAMIT files. (Thus, obtaining the first-order and second-order WAMIT files requires distinct WAMIT runs.)
 • The .7, .8, and .9 files contain the diagonal of the difference-frequency QTF, based on the first-order potential-flow solution. The files contain the second-order mean-drift loads (3 forces and 3 moments) per unit wave amplitude squared at each first-order wave frequency and pair of wave directions, across a range of frequencies and a range of direction pairs. While the .7, .8, and .9 files contains both the magnitude/phase and real/imaginary components of the second-order wave-excitation loads, only the latter are used by HydroDyn.
-• The 10d, .11d, and .12d, or .10s, .11s, and .12s files contain the full difference- and sum-frequency QTFs, respectively, based on the first-order or first- plus second-order potential-flow solutions. The files contain the second-order wave-excitation (diffraction) loads (3 forces and 3 moments) per unit wave amplitude squared at each pair of first-order wave frequencies and directions, across a range of frequency and direction pairs. While the 10d, .11d,.12d, .10s, .11s, and .12s files contains both the magnitude/phase and
-real/imaginary components of the second-order wave-excitation loads, only the latter are used by HydroDyn.
+• The 10d, .11d, and .12d, or .10s, .11s, and .12s files contain the full difference- and sum-frequency QTFs, respectively, based on the first-order or first- plus second-order potential-flow solutions. The files contain the second-order wave-excitation (diffraction) loads (3 forces and 3 moments) per unit wave amplitude squared at each pair of first-order wave frequencies and directions, across a range of frequency and direction pairs. While the 10d, .11d,.12d, .10s, .11s, and .12s files contains both the magnitude/phase and real/imaginary components of the second-order wave-excitation loads, only the latter are used by HydroDyn.
 • The frequencies and directions in the WAMIT files do not need to be evenly spaced.
 • The discretization of the first set of directions does not need to be the same as the discretization of the second set of directions; however, the matrix of direction pairs must be fully populated (not sparse). Both sets of directions should span across the desired range—the full direction range of (-180 to 180] degrees with a discretization of 10 degrees is suggested.
 • The frequencies should span the range where there is first-order wave energy and the frequency discretization should be such that the differences and sums between pairs of frequencies span the range where there is second-order wave energy. A range of 0.25 to 2.75 rad/s with a discretization of 0.05 rad/s is suggested.
