@@ -13,20 +13,20 @@ over the wetted surface of a floating platform. These loads include contribution
 Coordinate Systems
 --------------------
 
-Global coordinate system: (X,Y,Z)
+Global coordinate system: :math:`(X,Y,Z)`
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-• The global axes are represented by the unit vectors I?, ??J, and ??K.
-• The origin is set at the mean sea level, the center of the structure, with ?? axis positive upward.
-• The positive ?? axis is along the nominal (zero-degree) wave propagation direction.
-• The Y axis can be found assuming a right-handed Cartesian coordinate system.
+* The global axes are represented by the unit vectors :math:`\hat{I}`, :math:`\hat{J}`, and :math:`\hat{K}`.
+* The origin is set at the mean sea level, the center of the structure, with :math:`Z` axis positive upward.
+* The positive :math:`X` axis is along the nominal (zero-degree) wave propagation direction.
+* The :math:`Y` axis can be found assuming a right-handed Cartesian coordinate system.
 
-Structural member local coordinate system: (x,y,z)
+Structural member local coordinate system: :math:`(x,y,z)`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-• Axes are represented by the unit vectors i?, ?j, and ?k.
-• The origin is set at the center of the structural member.
-• The local ?? axis is along the cylinder axis, directed from the start joint to the end joint. The start joint is defined as the joint that has a lower ?? coordinate value. If the two joints have the same ?? coordinate value, then the one that has the lower ?? coordinate value is the start point. If the two joints have the same ?? and ?? coordinate value, then the one that has the lower ?? coordinate value is the start point.
-• The local ?? axis is parallel to the global ???? plane, positive along the nominal wave propagation direction. If the cylinder’s axis is along the global ?? direction, then the local ?? axis is parallel to the ???? plane, and positive along the negative global ?? direction.
-• The local y axis can be found assuming a right-handed Cartesian coordinate system.
+* Axes are represented by the unit vectors :math:`\hat{i}`, :math:`\hat{j}`, and :math:`\hat{k}`.
+* The origin is set at the center of the structural member.
+* The local :math:`z` axis is along the cylinder axis, directed from the start joint to the end joint. The start joint is defined as the joint that has a lower :math:`Z` coordinate value. If the two joints have the same :math:`Z` coordinate value, then the one that has the lower :math:`X` coordinate value is the start point. If the two joints have the same :math:`Z` and :math:`X` coordinate value, then the one that has the lower :math:`Y` coordinate value is the start point.
+* The local :math:`x` axis is parallel to the global :math:`XZ` plane, positive along the nominal wave propagation direction. If the cylinder’s axis is along the global :math:`X` direction, then the local :math:`x` axis is parallel to the :math:`XZ` plane, and positive along the negative global :math:`Z` direction.
+* The local :math:`y` axis can be found assuming a right-handed Cartesian coordinate system.
 
 Local to Global transformation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -36,13 +36,13 @@ For regular members, the cylinder expression in global coordinate system can be 
 Wave Kinematics
 ---------------------
 The wave kinematics are modeled using Airy wave theory, which can be used to describe either 
-regular or irregular waves. For regular waves, the wave elevation (?) is represented as a 
+regular or irregular waves. For regular waves, the wave elevation (:math:`\zeta`) is represented as a 
 sinusoid with a single amplitude (wave height) and frequency. Airy wave theory also describes 
 how the undisturbed fluid-particle velocities and accelerations decay exponentially with depth. 
 Irregular or random waves can then be represented as a summation or superposition of multiple 
 wave components, as described by an appropriate wave spectrum:
 
-EQUATION
+:math:`\zeta(t) = \frac{1}{2\pi} \int_-\infty^\infty W(\omega) \sqrt{2\pi S^{2-sided} (\omega) } \mathrm{e}^{j \omega t}\,\mathrm{d}\omega`
 
 This equation represents the wave elevation as an inverse Fourier transform of the desired 
 two-sided power spectral density, 2sidedS?- where j is an imaginary number and ? is an 
@@ -86,14 +86,14 @@ Modeling Approach
 In linear potential-flow theory, the forces and added mass are applied at the platform reference point. The components are:
 
 
-Morison’s Equation
+Morison's Equation
 ---------------------
-Morison’s equation is applicable for calculating the hydrodynamic loads on cylindrical 
+Morison's equation is applicable for calculating the hydrodynamic loads on cylindrical 
 structures when (1) the effects of diffraction are negligible, (2), radiation damping is 
-negligible, and (3) flow separation may occur. The relative form of Morison’s equation 
+negligible, and (3) flow separation may occur. The relative form of Morison's equation 
 accounts for wave loading from incident-wave-induced excitation, radiation-induced added 
 mass, and flow-separation-induced viscous drag. In this section we review the representation 
-of Morison’s equation both when considering distributed forces along the length of the 
+of Morison's equation both when considering distributed forces along the length of the 
 members (at nodes) and point loads at the ends (at the joints).
 
 
