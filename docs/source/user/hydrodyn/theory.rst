@@ -34,12 +34,44 @@ For regular members, the cylinder expression in global coordinate system can be 
 
 .. math::
 
+      \begin{Bmatrix} X \\ Y \\ Z \\ \end{Bmatrix} = \begin{bmatrix} C \end{bmatrix} \begin{Bmatrix} r \cos(\theta) \\ r \sin(\theta) \\ z \\ \end{Bmatrix} + \begin{Bmatrix} \frac{X_s+X_e}{2} \\ \frac{Y_s+Y_e}{2} \\ \frac{Z_s+Z_e}{2} \\ \end{Bmatrix}      
+
+where :math:`(X_s,Y_s,Z_s)` and :math:`(X_e,Y_e,Z_e)` are the start and end joints of the member in global coordinate system 
+of the member, and :math:`\begin{bmatrix} C \end{bmatrix}` is the direction cosine matrix of the member axis and can be obtained as follows:
+
+.. math::
+
       \begin{bmatrix} C \end{bmatrix} = 
    	\begin{bmatrix}
 		\frac{Z_e-Z_s}{L_{XZ}} & \frac{(X_e-X_s)(Y_e-Y_s)}{L_{XZ}L} & \frac{(X_e-X_s)}{L} \\
-		n_3 & 0 & -n_1 \\
-		-n_2 & n_1 & 0\\
+		0 & \frac{L_{XZ}}{L} & \frac{Y_e-Y_s}{L} \\
+		\frac{-X_e+X_s}{L_{XZ}} & -\frac{(Z_e-Z_s)(Y_e-Y_s)}{L_{XZ}L} & \frac{(Z_e-Z_s)}{L} \\
 		\end{bmatrix}
+      
+where :math:`L_{XZ} = \sqrt{(X_e-X_s)^2 + (Z_e-Z_s)^2}` and :math:`L = \sqrt{(X_e-X_s)^2 + (Y_e-Y_s)^2 + (Z_e-Z_s)^2}`.
+
+When :math:`X_e=X_s` and :math:`Z_e=Z_s` then the :math:`\begin{bmatrix} C \end{bmatrix}` matrix can be found as follows:
+
+if :math:`Y_e < Y_s` then
+
+.. math::
+      \begin{bmatrix} C \end{bmatrix} =
+      \being{bmatrix}
+      1 & 0 & 0 \\
+      0 & 0 & -1 \\
+      0 & 1 & 0 \\
+      \end{bmatrix}
+      
+else
+
+.. math::
+      \begin{bmatrix} C \end{bmatrix} =
+      \being{bmatrix}
+      1 & 0 & 0 \\
+      0 & 0 & 1 \\
+      0 & -1 & 0 \\
+      \end{bmatrix}
+      
       
 Wave Kinematics
 ---------------------
