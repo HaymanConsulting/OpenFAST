@@ -32,7 +32,15 @@ Local to Global transformation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 For regular members, the cylinder expression in global coordinate system can be found as follows:
 
+.. math::
 
+      \begin{bmatrix} C \end{bmatrix} = 
+   	\begin{bmatrix}
+		\frac{Z_e-Z_s}{L_{XZ}} & \frac{(X_e-X_s)(Y_e-Y_s)}{L_{XZ}L} & \frac{(X_e-X_s)}{L} \\
+		n_3 & 0 & -n_1 \\
+		-n_2 & n_1 & 0\\
+		\end{bmatrix}
+      
 Wave Kinematics
 ---------------------
 The wave kinematics are modeled using Airy wave theory, which can be used to describe either 
