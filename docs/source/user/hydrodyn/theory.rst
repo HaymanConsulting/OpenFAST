@@ -12,9 +12,20 @@ over the wetted surface of a floating platform. These loads include contribution
 
 Coordinate Systems
 --------------------
-
+   
 Global coordinate system: :math:`(X,Y,Z)`
 ^^^^^^^^^^^^^^^^^^^^^^^^^
+   
+:numref:`hd-frame` shows the coordinate system used in HydroDyn.
+
+.. _hd-frame:
+
+.. figure:: figs/hd_global_cs.pdf
+   :width: 100%
+   :align: center
+
+   Global (internal) coordinate system in HydroDyn (and OpenFAST).
+   
 * The global axes are represented by the unit vectors :math:`\hat{I}`, :math:`\hat{J}`, and :math:`\hat{K}`.
 * The origin is set at the mean sea level, the center of the structure, with :math:`Z` axis positive upward.
 * The positive :math:`X` axis is along the nominal (zero-degree) wave propagation direction.
@@ -55,6 +66,7 @@ When :math:`X_e=X_s` and :math:`Z_e=Z_s` then the :math:`\begin{bmatrix} C \end{
 if :math:`Y_e < Y_s` then
 
 .. math::
+
       \begin{bmatrix} C \end{bmatrix} =
       \being{bmatrix}
       1 & 0 & 0 \\
@@ -65,6 +77,7 @@ if :math:`Y_e < Y_s` then
 else
 
 .. math::
+
       \begin{bmatrix} C \end{bmatrix} =
       \being{bmatrix}
       1 & 0 & 0 \\
@@ -82,15 +95,15 @@ how the undisturbed fluid-particle velocities and accelerations decay exponentia
 Irregular or random waves can then be represented as a summation or superposition of multiple 
 wave components, as described by an appropriate wave spectrum:
 
-:math:`\zeta(t) = \frac{1}{2\pi} \int_-\infty^\infty W(\omega) \sqrt{2\pi S^{2-sided} (\omega) } \mathrm{e}^{j \omega t}\,\mathrm{d}\omega`
+:math:`\zeta(t) = \frac{1}{2\pi} \int_{-\infty}^\infty W(\omega) \sqrt{2\pi S_{\zeta}^{2-sided} (\omega) } \mathrm{e}^{j \omega t}\,\mathrm{d}\omega`
 
 This equation represents the wave elevation as an inverse Fourier transform of the desired 
-two-sided power spectral density, 2sidedS?- where j is an imaginary number and ? is an 
-individual wave frequency. W(?) is the Fourier transform of a realization of a white Gaussian 
+two-sided power spectral density, :math:`S_{\zeta}^{2-sided}` where :math:`j` is an imaginary number and :math:`\omega` is an 
+individual wave frequency. :math:`W(\omega)` is the Fourier transform of a realization of a white Gaussian 
 noise (WGN) time-series process with zero mean and unit variance (i.e., the so-called “standard 
 normal distribution”). This realization is used to ensure that the individual wave components 
 have a random phase and that the instantaneous wave elevation is normally- (i.e., Gaussian-) 
-distributed with zero mean and with a variance, on average, equal to ()22-Sided-Sd??s??8
+distributed with zero mean and with a variance, on average, equal to :math:`\sigma_{\zeta}^2 = \int_{-\infty}^\infty S_{\zeta}^{2-sided}\,\mathrm{d}\omega`.
 
 Further details about the wave kinematics and how they are computed can be found in [Jonkman, 2007].
 
