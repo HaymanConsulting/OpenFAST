@@ -20,7 +20,7 @@ Global coordinate system: :math:`(X,Y,Z)`
 
 .. _hd-frame:
 
-.. figure:: figs/hd_global_cs.pdf
+.. figure:: figs/hd_global_cs.png
    :width: 100%
    :align: center
 
