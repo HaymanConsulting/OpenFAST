@@ -144,7 +144,7 @@ where,
 
 :math:`\overrightarrow{F}_{AM} = -AM_{RP}\overrightarrow{a}_P`
 
-:math:`\overrightarrow{F}_{W} =`\frac{1}{N}\displaystyle\sum_{k=-\frac{N}{2}-1}^{\frac{N}{2}} W[k]\sqrt{\frac{2\pi}{\delta t} S_{\zeta}^{2-sided} (\omega) } X(\omega,\beta)|_{\omega=k\delta\omega}mathrm{e}^{j\frac{2\pi kn}{N}}`
+:math:`\overrightarrow{F}_{W} = \frac{1}{N}\displaystyle\sum_{k=-\frac{N}{2}-1}^{\frac{N}{2}} W[k]\sqrt{\frac{2\pi}{\Delta t} S_{\zeta}^{2-sided} (\omega) } X(\omega,\beta)|_{\omega=k\Delta\omega}mathrm{e}^{j\frac{2\pi kn}{N}}`
 
 :math:`\overrightarrow{F}_{HS} = \rho g V_0 (\{\zeta\}_3 + y^{CB}\{\zeta\}_4 - x^{CB}\{\zeta\}_5) - C^{Hydrostatic}x`
 
@@ -154,17 +154,17 @@ The general form of the convolution integral is:
 
 But we discretize this and only consider a specific amount of time history, :math:`N_{RD}`:
 
-:math:`\overrightarrow{F}_{RD_n} = -\delta t_{RD} \displaystyle\sum_{i=n-N_{RD}}^{n-1} K_{n-i-1}\dot{x_i}`
+:math:`\overrightarrow{F}_{RD_n} = -\Delta t_{RD} \displaystyle\sum_{i=n-N_{RD}}^{n-1} K_{n-i-1}\dot{x_i}`
 
 The state for time step :math:`n` is simply the structural velocities for the previous :math:`N_{RD}` time steps. Or,
 
-:math:`x_{n}^d = \begin{Bmatrix} \dot{x_{n-1}} \\ \dot{x_{n-2}} \\ \vdots \\ \dot{x_{n-N_{RD}}} \end{Bmatrix}
+:math:`x_{n}^d = \begin{Bmatrix} \dot{x_{n-1}} \\ \dot{x_{n-2}} \\ \vdots \\ \dot{x_{n-N_{RD}}} \end{Bmatrix}`
 
 Therefore, at time step :math:`n`, we can compute the :math:`n+1` state, such that,
 
-:math:`x_{n+1}^d = \begin{Bmatrix} \dot{x_n} \\ \dot{x_{n-1}}  \\ \vdots \\ \dot{x_{n-N_{RD}+1}} \end{Bmatrix}
+:math:`x_{n+1}^d = \begin{Bmatrix} \dot{x_n} \\ \dot{x_{n-1}}  \\ \vdots \\ \dot{x_{n-N_{RD}+1}} \end{Bmatrix}`
 
-The radiation step size, :math:`\delta t_{RD}`, and the radiation kernel, :math:`K`, are simply module parameters.
+The radiation step size, :math:`\Delta t_{RD}`, and the radiation kernel, :math:`K`, are simply module parameters.
 
 Morison's Equation
 ---------------------
