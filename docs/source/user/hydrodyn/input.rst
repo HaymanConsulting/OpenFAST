@@ -25,7 +25,7 @@ tables where the number of rows is specified.
 Units
 -----
 
-HydroDyn uses the SI system (kg, m, s, N). Angles are assumed to be in
+HydroDyn uses the SI system (:math:`kg`, :math:`m`, :math:`s`, :math:`N`). Angles are assumed to be in
 radians unless otherwise specified.
 
 HydroDyn Driver Input File
@@ -42,7 +42,7 @@ Set the ``Echo`` flag in this file to TRUE if you wish to have the
 for debugging errors in the driver file). The echo file has the naming
 convention of ``OutRootName.dvr.ech``, where ``OutRootName`` is
 specified in the HYDRODYN section of the driver input file.  Set the gravity 
-constant using the ``Gravity`` parameter. HydroDyn expects a magnitude, so in SI units this would be set to 9.80665 𝑚𝑠
+constant using the ``Gravity`` parameter. HydroDyn expects a magnitude, so in SI units this would be set to 9.80665 :math:`\frac{m}{s^2}`.�
 ``HDInputFile`` is the filename of the primary HydroDyn input file. This name should be in 
 quotations and can contain an absolute path or a relative path. All HydroDyn-generated output 
 files will be prefixed with ``OutRootName``. If this parameter includes a file path, the output will be generated in that folder. 
@@ -55,13 +55,13 @@ The WAMIT inputs file is a text-formatted file. This file has no header lines. E
 and the whitespace separated columns of floating point values represent the necessary motion 
 inputs as follows:
 
-* Column   1   : Time step value (s)𝑠
-* Columns  2-4 : Translational displacements along X, Y, and Z (m)𝑚
-* Columns  5-7 : Rotational displacements about X, Y, and Z [small angle] (radians)
-* Columns  8-10: Translational velocities along X, Y, and Z (m/s)
-* Columns 11-13: Rotational velocities about X, Y, and Z (radians/s)
-* Columns 14-16: Translational accelerations along X, Y, and Z (m/s\ :sup:`2`)
-* Columns 17-19: Rotational accelerations about X, Y, and Z (radians/s\ :sup:`2`)
+* Column   1   : Time step value (:math:`s`)
+* Columns  2-4 : Translational displacements along X, Y, and Z (:math:`m`)
+* Columns  5-7 : Rotational displacements about X, Y, and Z [small angle] (:math:`radians`)
+* Columns  8-10: Translational velocities along X, Y, and Z (:math:`\frac{m}{s}`)
+* Columns 11-13: Rotational velocities about X, Y, and Z (:math:`\frac{radians}{s}`)
+* Columns 14-16: Translational accelerations along X, Y, and Z (:math:`\frac{m}{s^2}`)
+* Columns 17-19: Rotational accelerations about X, Y, and Z (:math:`\frac{radians}{s^2}`)
 
 All motions are specified in the global inertial-frame coordinate system.
 
@@ -76,12 +76,12 @@ specified for the WRP and Morison members in the driver file.
 
 Setting ``WaveElevSeriesFlag`` to TRUE enables the outputting of a grid of wave 
 elevations to a text-based file with the name ``OutRootName.WaveElev.out``. 
-The grid consists of ``WaveElevNX`` by ``WaveElevNY`` wave elevations (centered at X = 0, 
-Y = 0 i.e., (0,0)) with a dX and dY spacing in the global inertial-frame 
+The grid consists of ``WaveElevNX`` by ``WaveElevNY`` wave elevations (centered at :math:`X = 0`, 
+:math:`Y = 0` i.e., (:math:`0,0`)) with a dX and dY spacing in the global inertial-frame 
 coordinate system. These wave elevations are distinct and output separately 
 from the wave elevations determined by ``NWaveElev`` in the HydroDyn primary input file, 
-such that the total number of wave elevation outputs is ``NWaveElev`` + 
-( ``WaveElevNX`` × ``WaveElevNY`` ). The wave-elevation output file ``OutRootName.WaveElev.out`` 
+such that the total number of wave elevation outputs is ``NWaveElev`` :math:`+` 
+( ``WaveElevNX`` :math:`\times` ``WaveElevNY`` ). The wave-elevation output file ``OutRootName.WaveElev.out`` 
 contains the total wave elevation, which is the sum of the first- and second-order 
 terms (when the second-order wave kinematics are optionally enabled).
 

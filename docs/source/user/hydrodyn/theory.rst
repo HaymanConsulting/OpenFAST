@@ -27,7 +27,7 @@ Global coordinate system: :math:`(X,Y,Z)`
    Global (internal) coordinate system in HydroDyn (and OpenFAST).
    
 * The global axes are represented by the unit vectors :math:`\hat{I}`, :math:`\hat{J}`, and :math:`\hat{K}`.
-* The origin is set at the mean sea level, the center of the structure, with :math:`Z` axis positive upward.
+* The origin is set at the mean sea level (MSL), the center of the structure, with :math:`Z` axis positive upward.
 * The positive :math:`X` axis is along the nominal (zero-degree) wave propagation direction.
 * The :math:`Y` axis can be found assuming a right-handed Cartesian coordinate system.
 
@@ -144,7 +144,7 @@ where,
 
 :math:`\overrightarrow{F}_{AM} = -AM_{RP}\overrightarrow{a}_P`
 
-:math:`\overrightarrow{F}_{W} = \frac{1}{N}\displaystyle\sum_{k=-\frac{N}{2}-1}^{\frac{N}{2}} W[k]\sqrt{\frac{2\pi}{\Delta t} S_{\zeta}^{2-sided} (\omega) } X(\omega,\beta)|_{\omega=k\Delta\omega}mathrm{e}^{j\frac{2\pi kn}{N}}`
+:math:`\overrightarrow{F}_{W} = \frac{1}{N}\displaystyle\sum_{k=-\frac{N}{2}-1}^{\frac{N}{2}} W[k]\sqrt{\frac{2\pi}{\Delta t} S_{\zeta}^{2-sided} (\omega) } X(\omega,\beta)|_{\omega=k\Delta\omega}\mathrm{e}^{j\frac{2\pi kn}{N}}`
 
 :math:`\overrightarrow{F}_{HS} = \rho g V_0 (\{\zeta\}_3 + y^{CB}\{\zeta\}_4 - x^{CB}\{\zeta\}_5) - C^{Hydrostatic}x`
 
@@ -176,7 +176,18 @@ mass, and flow-separation-induced viscous drag. In this section we review the re
 of Morison's equation both when considering distributed forces along the length of the 
 members (at nodes) and point loads at the ends (at the joints).
 
+Modeling Approach
+^^^^^^^^^^^^^^^^^^^^
+In HydroDyn, Morison forces are applied base on three possible wave stretching models. 
 
+1) No wave stretching: forces applied only along the portion of the member below the MSL.
+2) Vertical wave stretching: wave kinematics at the MSL are applied up to the instantaneous free surface, and left unchanged below the MSL.
+3) Extrapolation stretching: a linear Taylor expansion of the wave kinematics (and their partial derivatives with respect to z) at the MSL is applied to find the wave kinematics above the MSL and up to the instantaneous free surface, and left unchanged below the MSL.
+
+Forces are applied at the original position of the structure, and not at the instantaneous position.
+
+Distributed Loads
+For a Morison-only model, the distributed hydrodynamic loads applied along the length of a member are computed as:
 
 
 

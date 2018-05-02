@@ -20,5 +20,6 @@ HydroDyn Users Guide and Theory Manual
    output.rst
    modeling.rst
    theory.rst
+   references.rst
    appendix.rst
       
