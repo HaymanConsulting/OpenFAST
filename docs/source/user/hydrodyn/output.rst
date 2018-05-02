@@ -1,4 +1,4 @@
-.. hd__output:
+.. _hd_output:
 
 Output Files
 ============

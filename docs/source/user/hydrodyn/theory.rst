@@ -1,4 +1,4 @@
-.. hd__theory:
+.. _hd_theory:
 
 HydroDyn Theory
 ================
