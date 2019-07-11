@@ -193,9 +193,9 @@ SUBROUTINE HydroDynInput_GetInput( InitInp, ErrStat, ErrMsg )
 
       ! Passed variables
 
-   TYPE(HydroDyn_InitInputType),  INTENT( INOUT )   :: InitInp              ! the hydrodyn data
-   INTEGER,                       INTENT(   OUT )   :: ErrStat              ! returns a non-zero value when an error occurs
-   CHARACTER(*),                  INTENT(   OUT )   :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   TYPE(HD_InitInputType),  INTENT( INOUT )   :: InitInp              ! the hydrodyn data
+   INTEGER,                 INTENT(   OUT )   :: ErrStat              ! returns a non-zero value when an error occurs
+   CHARACTER(*),            INTENT(   OUT )   :: ErrMsg               ! Error message if ErrStat /= ErrID_None
 
 
       ! Local variables
@@ -2291,9 +2291,9 @@ SUBROUTINE HydroDynInput_ProcessInitData( InitInp, ErrStat, ErrMsg )
 
       ! Passed variables
 
-   TYPE(HydroDyn_InitInputType),  INTENT( INOUT )   :: InitInp              ! the hydrodyn data
-   INTEGER,                       INTENT(   OUT )   :: ErrStat              ! returns a non-zero value when an error occurs
-   CHARACTER(*),                  INTENT(   OUT )   :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   TYPE(HD_InitInputType),  INTENT( INOUT )   :: InitInp              ! the hydrodyn data
+   INTEGER,                 INTENT(   OUT )   :: ErrStat              ! returns a non-zero value when an error occurs
+   CHARACTER(*),            INTENT(   OUT )   :: ErrMsg               ! Error message if ErrStat /= ErrID_None
 
    INTEGER                                          :: I                    ! Generic loop counter index
    INTEGER                                          :: J                    ! Generic loop counter index

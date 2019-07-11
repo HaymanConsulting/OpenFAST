@@ -132,8 +132,8 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
    TYPE(SC_InitInputType)                  :: InitInData_SC       ! Initialization input data
    TYPE(SC_InitOutputType)                 :: InitOutData_SC      ! Initialization output data
 
-   TYPE(HydroDyn_InitInputType)            :: InitInData_HD       ! Initialization input data
-   TYPE(HydroDyn_InitOutputType)           :: InitOutData_HD      ! Initialization output data
+   TYPE(HD_InitInputType)                  :: InitInData_HD       ! Initialization input data
+   TYPE(HD_InitOutputType)                 :: InitOutData_HD      ! Initialization output data
                                            
    TYPE(SD_InitInputType)                  :: InitInData_SD       ! Initialization input data
    TYPE(SD_InitOutputType)                 :: InitOutData_SD      ! Initialization output data
@@ -811,7 +811,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, 
       InitInData_HD%PtfmLocationX = p_FAST%TurbinePos(1) 
       InitInData_HD%PtfmLocationY = p_FAST%TurbinePos(2)
       
-      CALL HydroDyn_Init( InitInData_HD, HD%Input(1), HD%p,  HD%x(STATE_CURR), HD%xd(STATE_CURR), HD%z(STATE_CURR), &
+      CALL HD_Init( InitInData_HD, HD%Input(1), HD%p,  HD%x(STATE_CURR), HD%xd(STATE_CURR), HD%z(STATE_CURR), &
                           HD%OtherSt(STATE_CURR), HD%y, HD%m, p_FAST%dt_module( MODULE_HD ), InitOutData_HD, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
          
@@ -1303,9 +1303,9 @@ CONTAINS
       CALL SrvD_DestroyInitOutput( InitOutData_SrvD, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
-      CALL HydroDyn_DestroyInitInput(  InitInData_HD,  ErrStat2, ErrMsg2 )
+      CALL HD_DestroyInitInput(  InitInData_HD,  ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-      CALL HydroDyn_DestroyInitOutput( InitOutData_HD, ErrStat2, ErrMsg2 )
+      CALL HD_DestroyInitOutput( InitOutData_HD, ErrStat2, ErrMsg2 )
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
       CALL SD_DestroyInitInput(  InitInData_SD,  ErrStat2, ErrMsg2 )
@@ -1833,7 +1833,7 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, InitOutData_ED, InitOutData_BD, Init
    TYPE(AD_InitOutputType),        INTENT(IN)           :: InitOutData_AD                        !< Initialization output for AeroDyn
    TYPE(InflowWind_InitOutputType),INTENT(IN)           :: InitOutData_IfW                       !< Initialization output for InflowWind
    TYPE(OpFM_InitOutputType),      INTENT(IN)           :: InitOutData_OpFM                      !< Initialization output for OpenFOAM
-   TYPE(HydroDyn_InitOutputType),  INTENT(IN)           :: InitOutData_HD                        !< Initialization output for HydroDyn
+   TYPE(HD_InitOutputType),        INTENT(IN)           :: InitOutData_HD                        !< Initialization output for HydroDyn
    TYPE(SD_InitOutputType),        INTENT(IN)           :: InitOutData_SD                        !< Initialization output for SubDyn
    TYPE(ExtPtfm_InitOutputType),   INTENT(IN)           :: InitOutData_ExtPtfm                   !< Initialization output for ExtPtfm_MCKF
    TYPE(MAP_InitOutputType),       INTENT(IN)           :: InitOutData_MAP                       !< Initialization output for MAP
@@ -2978,7 +2978,7 @@ SUBROUTINE SetVTKParameters_B4HD(p_FAST, InitOutData_ED, InitInData_HD, BD, ErrS
 
    TYPE(FAST_ParameterType),     INTENT(INOUT) :: p_FAST           !< The parameters of the glue code
    TYPE(ED_InitOutputType),      INTENT(IN   ) :: InitOutData_ED   !< The initialization output from structural dynamics module
-   TYPE(HydroDyn_InitInputType), INTENT(INOUT) :: InitInData_HD    !< The initialization input to HydroDyn
+   TYPE(HD_InitInputType),       INTENT(INOUT) :: InitInData_HD    !< The initialization input to HydroDyn
    TYPE(BeamDyn_Data),           INTENT(IN   ) :: BD               !< BeamDyn data
    INTEGER(IntKi),               INTENT(  OUT) :: ErrStat          !< Error status of the operation
    CHARACTER(*),                 INTENT(  OUT) :: ErrMsg           !< Error message if ErrStat /= ErrID_None
@@ -3043,8 +3043,8 @@ SUBROUTINE SetVTKParameters(p_FAST, InitOutData_ED, InitOutData_AD, InitInData_H
    TYPE(FAST_ParameterType),     INTENT(INOUT) :: p_FAST           !< The parameters of the glue code
    TYPE(ED_InitOutputType),      INTENT(IN   ) :: InitOutData_ED   !< The initialization output from structural dynamics module
    TYPE(AD_InitOutputType),      INTENT(INOUT) :: InitOutData_AD   !< The initialization output from AeroDyn
-   TYPE(HydroDyn_InitInputType), INTENT(INOUT) :: InitInData_HD    !< The initialization input to HydroDyn
-   TYPE(HydroDyn_InitOutputType),INTENT(INOUT) :: InitOutData_HD   !< The initialization output from HydroDyn
+   TYPE(HD_InitInputType),       INTENT(INOUT) :: InitInData_HD    !< The initialization input to HydroDyn
+   TYPE(HD_InitOutputType),      INTENT(INOUT) :: InitOutData_HD   !< The initialization output from HydroDyn
    TYPE(ElastoDyn_Data),         INTENT(IN   ) :: ED               !< ElastoDyn data
    TYPE(BeamDyn_Data),           INTENT(IN   ) :: BD               !< BeamDyn data
    TYPE(AeroDyn_Data),           INTENT(IN   ) :: AD               !< AeroDyn data
@@ -4111,21 +4111,21 @@ SUBROUTINE FAST_InitIOarrays( t_initial, p_FAST, y_FAST, m_FAST, ED, BD, SrvD, A
       END DO
 
       DO j = 2, p_FAST%InterpOrder + 1
-         CALL HydroDyn_CopyInput (HD%Input(1),  HD%Input(j),  MESH_NEWCOPY, Errstat2, ErrMsg2)
+         CALL HD_CopyInput (HD%Input(1),  HD%Input(j),  MESH_NEWCOPY, Errstat2, ErrMsg2)
             CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END DO
-      CALL HydroDyn_CopyInput (HD%Input(1),  HD%u,  MESH_NEWCOPY, Errstat2, ErrMsg2) ! do this to initialize meshes/allocatable arrays for output of ExtrapInterp routine
+      CALL HD_CopyInput (HD%Input(1),  HD%u,  MESH_NEWCOPY, Errstat2, ErrMsg2) ! do this to initialize meshes/allocatable arrays for output of ExtrapInterp routine
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
 
          ! Initialize predicted states for j_pc loop:
-      CALL HydroDyn_CopyContState   (HD%x( STATE_CURR), HD%x( STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyContState   (HD%x( STATE_CURR), HD%x( STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyDiscState   (HD%xd(STATE_CURR), HD%xd(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)  
+      CALL HD_CopyDiscState   (HD%xd(STATE_CURR), HD%xd(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)  
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyConstrState (HD%z( STATE_CURR), HD%z( STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyConstrState (HD%z( STATE_CURR), HD%z( STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyOtherState( HD%OtherSt(STATE_CURR), HD%OtherSt(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyOtherState( HD%OtherSt(STATE_CURR), HD%OtherSt(STATE_PRED), MESH_NEWCOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )   
       
    END IF !CompHydro
@@ -4567,13 +4567,13 @@ SUBROUTINE FAST_Solution(t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED, BD, 
       
    ! HydroDyn: copy final predictions to actual states
    IF ( p_FAST%CompHydro == Module_HD ) THEN         
-      CALL HydroDyn_CopyContState   (HD%x( STATE_PRED), HD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyContState   (HD%x( STATE_PRED), HD%x( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyDiscState   (HD%xd(STATE_PRED), HD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)  
+      CALL HD_CopyDiscState   (HD%xd(STATE_PRED), HD%xd(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)  
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyConstrState (HD%z( STATE_PRED), HD%z( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyConstrState (HD%z( STATE_PRED), HD%z( STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyOtherState (HD%OtherSt(STATE_PRED), HD%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyOtherState (HD%OtherSt(STATE_PRED), HD%OtherSt(STATE_CURR), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    END IF
             
@@ -5649,7 +5649,7 @@ SUBROUTINE WriteInputMeshesToFile(u_ED, u_AD, u_SD, u_HD, u_MAP, u_BD, FileName,
    TYPE(ED_InputType),        INTENT(IN)  :: u_ED           !< ElastoDyn inputs
    TYPE(AD_InputType),        INTENT(IN)  :: u_AD           !< AeroDyn inputs
    TYPE(SD_InputType),        INTENT(IN)  :: u_SD           !< SubDyn inputs
-   TYPE(HydroDyn_InputType),  INTENT(IN)  :: u_HD           !< HydroDyn inputs
+   TYPE(HD_InputType),        INTENT(IN)  :: u_HD           !< HydroDyn inputs
    TYPE(MAP_InputType),       INTENT(IN)  :: u_MAP          !< MAP inputs
    TYPE(BD_InputType),        INTENT(IN)  :: u_BD(:)        !< BeamDyn inputs
    CHARACTER(*),              INTENT(IN)  :: FileName       !< Name of file to write this information to
@@ -5718,7 +5718,7 @@ SUBROUTINE WriteMotionMeshesToFile(time, y_ED, u_SD, y_SD, u_HD, u_MAP, y_BD, u_
    TYPE(ED_OutputType),        INTENT(IN)    :: y_ED           !< ElastoDyn outputs
    TYPE(SD_InputType),         INTENT(IN)    :: u_SD           !< SubDyn inputs
    TYPE(SD_OutputType),        INTENT(IN)    :: y_SD           !< SubDyn outputs
-   TYPE(HydroDyn_InputType),   INTENT(IN)    :: u_HD           !< HydroDyn inputs
+   TYPE(HD_InputType),         INTENT(IN)    :: u_HD           !< HydroDyn inputs
    TYPE(MAP_InputType),        INTENT(IN)    :: u_MAP          !< MAP inputs
    TYPE(BD_OutputType),        INTENT(IN)    :: y_BD(:)        !< BeamDyn outputs
    TYPE(BD_InputType),         INTENT(IN)    :: u_BD(:)        !< BeamDyn inputs
@@ -6174,7 +6174,7 @@ SUBROUTINE FAST_EndMods( p_FAST, y_FAST, m_FAST, ED, BD, SrvD, AD14, AD, IfW, HD
    END IF
 
    IF ( p_FAST%ModuleInitialized(Module_HD) ) THEN
-      CALL HydroDyn_End( HD%Input(1), HD%p, HD%x(STATE_CURR), HD%xd(STATE_CURR), HD%z(STATE_CURR), HD%OtherSt(STATE_CURR),  &
+      CALL HD_End( HD%Input(1), HD%p, HD%x(STATE_CURR), HD%xd(STATE_CURR), HD%z(STATE_CURR), HD%OtherSt(STATE_CURR),  &
                          HD%y, HD%m, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    END IF

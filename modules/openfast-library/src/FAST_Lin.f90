@@ -2506,7 +2506,7 @@ SUBROUTINE Linear_HD_InputSolve_du( p_FAST, y_FAST, u_HD, y_ED, MeshMapData, dUd
       ! Passed variables
    TYPE(FAST_ParameterType),    INTENT(IN   )   :: p_FAST      !< FAST parameter data    
    TYPE(FAST_OutputFileType),   INTENT(IN   )   :: y_FAST      !< FAST output file data (for linearization)
-   TYPE(HydroDyn_InputType),    INTENT(INOUT)   :: u_HD        !< The inputs to HydroDyn
+   TYPE(HD_InputType),          INTENT(INOUT)   :: u_HD        !< The inputs to HydroDyn
    TYPE(ED_OutputType),         INTENT(IN)      :: y_ED        !< The outputs from the structural dynamics module
    TYPE(FAST_ModuleMapType),    INTENT(INOUT)   :: MeshMapData !< Data for mapping between modules
    REAL(R8Ki),                  INTENT(INOUT)   :: dUdu(:,:)   !< Jacobian matrix of which we are computing the dU^{HD}/du^{HD} block
@@ -2627,7 +2627,7 @@ SUBROUTINE Linear_HD_InputSolve_dy( p_FAST, y_FAST, u_HD, y_ED, MeshMapData, dUd
       ! Passed variables
    TYPE(FAST_ParameterType),    INTENT(IN   )   :: p_FAST      !< FAST parameter data    
    TYPE(FAST_OutputFileType),   INTENT(IN   )   :: y_FAST      !< FAST output file data (for linearization)
-   TYPE(HydroDyn_InputType),    INTENT(INOUT)   :: u_HD        !< The inputs to HydroDyn
+   TYPE(HD_InputType),          INTENT(INOUT)   :: u_HD        !< The inputs to HydroDyn
    TYPE(ED_OutputType),         INTENT(IN)      :: y_ED        !< The outputs from the structural dynamics module
    TYPE(FAST_ModuleMapType),    INTENT(INOUT)   :: MeshMapData !< Data for mapping between modules
    REAL(R8Ki),                  INTENT(INOUT)   :: dUdy(:,:)   !< Jacobian matrix of which we are computing the dU^{HD}/dy^{ED} block
@@ -3671,7 +3671,7 @@ END FUNCTION Indx_u_AD_BladeInflow_Start
 !> This routine returns the starting index for the u_HD%Morison%DistribMesh mesh in the FAST linearization inputs.
 FUNCTION Indx_u_HD_Distrib_Start(u_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_InputType),       INTENT(IN )  :: u_HD             !< HD Inputs at t
+   TYPE(HD_InputType),             INTENT(IN )  :: u_HD             !< HD Inputs at t
 
    INTEGER                                      :: HD_Start         !< starting index of this mesh in HydroDyn inputs
 
@@ -3682,7 +3682,7 @@ END FUNCTION Indx_u_HD_Distrib_Start
 !> This routine returns the starting index for the u_HD%Morison%LumpedMesh mesh in the FAST linearization inputs.
 FUNCTION Indx_u_HD_Lumped_Start(u_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_InputType),       INTENT(IN )  :: u_HD             !< HD Inputs at t
+   TYPE(HD_InputType),             INTENT(IN )  :: u_HD             !< HD Inputs at t
 
    INTEGER                                      :: HD_Start         !< starting index of this mesh in HydroDyn inputs
 
@@ -3694,7 +3694,7 @@ END FUNCTION Indx_u_HD_Lumped_Start
 !> This routine returns the starting index for the u_HD%Mesh mesh in the FAST linearization inputs.
 FUNCTION Indx_u_HD_PlatformRef_Start(u_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_InputType),       INTENT(IN )  :: u_HD             !< HD Inputs at t
+   TYPE(HD_InputType),             INTENT(IN )  :: u_HD             !< HD Inputs at t
 
    INTEGER                                      :: HD_Start         !< starting index of this mesh in HydroDyn inputs
 
@@ -3706,7 +3706,7 @@ FUNCTION Indx_u_HD_PlatformRef_Start(u_HD, y_FAST) RESULT(HD_Start)
 !> This routine returns the starting index for the y_HD%Morison%DistribMesh mesh in the FAST linearization outputs.
 FUNCTION Indx_y_HD_Distrib_Start(y_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_OutputType),      INTENT(IN )  :: y_HD             !< HD Outputs at t
+   TYPE(HD_OutputType),            INTENT(IN )  :: y_HD             !< HD Outputs at t
 
    INTEGER                                      :: HD_Start         !< starting index of this mesh in HydroDyn Outputs
 
@@ -3717,7 +3717,7 @@ END FUNCTION Indx_y_HD_Distrib_Start
 !> This routine returns the starting index for the y_HD%Morison%LumpedMesh mesh in the FAST linearization outputs.
 FUNCTION Indx_y_HD_Lumped_Start(y_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_OutputType),      INTENT(IN )  :: y_HD             !< HD Outputs at t
+   TYPE(HD_OutputType),            INTENT(IN )  :: y_HD             !< HD Outputs at t
 
    INTEGER                                      :: HD_Start         !< starting index of this mesh in HydroDyn Outputs
 
@@ -3729,7 +3729,7 @@ END FUNCTION Indx_y_HD_Lumped_Start
 !> This routine returns the starting index for the y_HD%Mesh mesh in the FAST linearization outputs.
 FUNCTION Indx_y_HD_PlatformRef_Start(y_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_OutputType),      INTENT(IN )  :: y_HD             !< HD Outputs at t
+   TYPE(HD_OutputType),            INTENT(IN )  :: y_HD             !< HD Outputs at t
 
    INTEGER                                      :: HD_Start
    
@@ -3743,7 +3743,7 @@ FUNCTION Indx_y_HD_PlatformRef_Start(y_HD, y_FAST) RESULT(HD_Start)
 !> This routine returns the starting index for the y_HD%AllHdroOrigin mesh in the FAST linearization outputs.
 FUNCTION Indx_y_HD_AllHdro_Start(y_HD, y_FAST) RESULT(HD_Start)
    TYPE(FAST_OutputFileType),      INTENT(IN )  :: y_FAST           !< FAST output file data (for linearization)
-   TYPE(HydroDyn_OutputType),      INTENT(IN )  :: y_HD             !< HD Outputs at t
+   TYPE(HD_OutputType),            INTENT(IN )  :: y_HD             !< HD Outputs at t
 
    INTEGER                                      :: HD_Start
    

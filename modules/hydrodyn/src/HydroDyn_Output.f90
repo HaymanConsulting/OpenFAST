@@ -395,22 +395,22 @@ END SUBROUTINE HDOut_WriteWvKinFiles
 !====================================================================================================
 SUBROUTINE HDOut_MapOutputs( CurrentTime, y, NWaveElev, WaveElev, WaveElev1, F_Add, F_Waves, F_Hydro, q, qdot, qdotdot, AllOuts, ErrStat, ErrMsg )
 ! This subroutine writes the data stored in the y variable to the correct indexed postions in WriteOutput
-! This is called by HydroDyn_CalcOutput() at each time step.
+! This is called by HD_CalcOutput() at each time step.
 !---------------------------------------------------------------------------------------------------- 
-   REAL(DbKi),                         INTENT( IN    )  :: CurrentTime    ! Current simulation time in seconds
-   TYPE(HydroDyn_OutputType),          INTENT( INOUT )  :: y              ! HydroDyn's output data
-   INTEGER,                            INTENT( IN    )  :: NWaveElev      ! Number of wave elevation locations to output
-   REAL(ReKi),                         INTENT( IN    )  :: WaveElev(:)    ! Instantaneous total elevation of incident waves at each of the NWaveElev points where the incident wave elevations can be output (meters)   
-   REAL(ReKi),                         INTENT( IN    )  :: WaveElev1(:)    ! Instantaneous first order elevation of incident waves at each of the NWaveElev points where the incident wave elevations can be output (meters)   
-   REAL(ReKi),                         INTENT( IN    )  :: F_Add(6)
-   REAL(ReKi),                         INTENT( IN    )  :: F_Waves(6)
-   REAL(ReKi),                         INTENT( IN    )  :: F_Hydro(6)
-   REAL(ReKi),                         INTENT( IN    )  :: q(6)           ! WRP translations and rotations
-   REAL(ReKi),                         INTENT( IN    )  :: qdot(6)        ! WRP translational and rotational velocities
-   REAL(ReKi),                         INTENT( IN    )  :: qdotdot(6)     ! WRP translational and rotational accelerations
-   REAL(ReKi),                         INTENT(   OUT )  :: AllOuts(MaxHDOutputs)
-   INTEGER(IntKi),                     INTENT(   OUT )  :: ErrStat        ! Error status of the operation
-   CHARACTER(*),                       INTENT(   OUT )  :: ErrMsg         ! Error message if ErrStat /= ErrID_None
+   REAL(DbKi),                   INTENT( IN    )  :: CurrentTime    ! Current simulation time in seconds
+   TYPE(HD_OutputType),          INTENT( INOUT )  :: y              ! HydroDyn's output data
+   INTEGER,                      INTENT( IN    )  :: NWaveElev      ! Number of wave elevation locations to output
+   REAL(ReKi),                   INTENT( IN    )  :: WaveElev(:)    ! Instantaneous total elevation of incident waves at each of the NWaveElev points where the incident wave elevations can be output (meters)   
+   REAL(ReKi),                   INTENT( IN    )  :: WaveElev1(:)    ! Instantaneous first order elevation of incident waves at each of the NWaveElev points where the incident wave elevations can be output (meters)   
+   REAL(ReKi),                   INTENT( IN    )  :: F_Add(6)
+   REAL(ReKi),                   INTENT( IN    )  :: F_Waves(6)
+   REAL(ReKi),                   INTENT( IN    )  :: F_Hydro(6)
+   REAL(ReKi),                   INTENT( IN    )  :: q(6)           ! WRP translations and rotations
+   REAL(ReKi),                   INTENT( IN    )  :: qdot(6)        ! WRP translational and rotational velocities
+   REAL(ReKi),                   INTENT( IN    )  :: qdotdot(6)     ! WRP translational and rotational accelerations
+   REAL(ReKi),                   INTENT(   OUT )  :: AllOuts(MaxHDOutputs)
+   INTEGER(IntKi),               INTENT(   OUT )  :: ErrStat        ! Error status of the operation
+   CHARACTER(*),                 INTENT(   OUT )  :: ErrMsg         ! Error message if ErrStat /= ErrID_None
 
    INTEGER                                              :: I
    
@@ -445,12 +445,12 @@ SUBROUTINE HDOut_WriteOutputs( Time, y, p, Decimate, ErrStat, ErrMsg )
 !---------------------------------------------------------------------------------------------------- 
 
       ! Passed variables    
-   REAL(DbKi),                   INTENT( IN    ) :: Time
-   TYPE(HydroDyn_OutputType),    INTENT( INOUT ) :: y                    ! HydroDyn's output data
-   TYPE(HydroDyn_ParameterType), INTENT( IN    ) :: p                    ! HydroDyn parameter data
-   INTEGER,                      INTENT( INOUT ) :: Decimate             ! Output decimatation counter
-   INTEGER,                      INTENT(   OUT ) :: ErrStat              ! returns a non-zero value when an error occurs  
-   CHARACTER(*),                 INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   REAL(DbKi),             INTENT( IN    ) :: Time
+   TYPE(HD_OutputType),    INTENT( INOUT ) :: y                    ! HydroDyn's output data
+   TYPE(HD_ParameterType), INTENT( IN    ) :: p                    ! HydroDyn parameter data
+   INTEGER,                INTENT( INOUT ) :: Decimate             ! Output decimatation counter
+   INTEGER,                INTENT(   OUT ) :: ErrStat              ! returns a non-zero value when an error occurs  
+   CHARACTER(*),           INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
    
       ! Local variables
    INTEGER                                :: I                           ! Generic loop counter
@@ -524,7 +524,7 @@ SUBROUTINE HDOut_WriteOutputs( Time, y, p, Decimate, ErrStat, ErrMsg )
 END SUBROUTINE HDOut_WriteOutputs
 
 !====================================================================================================
-SUBROUTINE HDOUT_Init( HydroDyn_ProgDesc, InitInp, y,  p, m, InitOut, ErrStat, ErrMsg )
+SUBROUTINE HDOUT_Init( HD_ProgDesc, InitInp, y,  p, m, InitOut, ErrStat, ErrMsg )
 ! This subroutine initialized the output module, checking if the output parameter list (OutList)
 ! contains valid names, and opening the output file if there are any requested outputs
 ! NOTE: This routine must be called only after any sub-modules OUT_Init() subroutines have been called.
@@ -534,14 +534,14 @@ SUBROUTINE HDOUT_Init( HydroDyn_ProgDesc, InitInp, y,  p, m, InitOut, ErrStat, E
 
       ! Passed variables
 
-   TYPE(ProgDesc),                INTENT( IN    ) :: HydroDyn_ProgDesc    ! 
-   TYPE(HydroDyn_InitInputType ), INTENT( IN    ) :: InitInp              ! data needed to initialize the output module     
-   TYPE(HydroDyn_OutputType),     INTENT( INOUT ) :: y                    ! This module's internal data
-   TYPE(HydroDyn_ParameterType),  INTENT( INOUT ) :: p 
-   TYPE(HydroDyn_MiscVarType),    INTENT( INOUT ) :: m
-   TYPE(HydroDyn_InitOutputType), INTENT( INOUT ) :: InitOut
-   INTEGER,                       INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
-   CHARACTER(*),                  INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   TYPE(ProgDesc),          INTENT( IN    ) :: HD_ProgDesc    ! 
+   TYPE(HD_InitInputType ), INTENT( IN    ) :: InitInp              ! data needed to initialize the output module     
+   TYPE(HD_OutputType),     INTENT( INOUT ) :: y                    ! This module's internal data
+   TYPE(HD_ParameterType),  INTENT( INOUT ) :: p 
+   TYPE(HD_MiscVarType),    INTENT( INOUT ) :: m
+   TYPE(HD_InitOutputType), INTENT( INOUT ) :: InitOut
+   INTEGER,                 INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
+   CHARACTER(*),            INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
    
       ! Local variables
    INTEGER                                        :: I                    ! Generic loop counter      
@@ -713,7 +713,7 @@ SUBROUTINE HDOUT_Init( HydroDyn_ProgDesc, InitInp, y,  p, m, InitOut, ErrStat, E
       !END IF
       
       IF ( p%OutSwtch == 1 .OR. p%OutSwtch == 3 ) THEN
-         CALL HDOut_OpenOutput( HydroDyn_ProgDesc, InitInp%OutRootName, p, InitOut, ErrStat, ErrMsg )
+         CALL HDOut_OpenOutput( HD_ProgDesc, InitInp%OutRootName, p, InitOut, ErrStat, ErrMsg )
          IF (ErrStat >= AbortErrLev ) RETURN
       END IF
       
@@ -724,7 +724,7 @@ SUBROUTINE HDOUT_Init( HydroDyn_ProgDesc, InitInp, y,  p, m, InitOut, ErrStat, E
 END SUBROUTINE HDOUT_Init
 
 !====================================================================================================
-SUBROUTINE HDOut_OpenOutput( HydroDyn_ProgDesc, OutRootName,  p, InitOut, ErrStat, ErrMsg )
+SUBROUTINE HDOut_OpenOutput( HD_ProgDesc, OutRootName,  p, InitOut, ErrStat, ErrMsg )
 ! This subroutine initialized the output module, checking if the output parameter list (OutList)
 ! contains valid names, and opening the output file if there are any requested outputs
 !----------------------------------------------------------------------------------------------------
@@ -733,12 +733,12 @@ SUBROUTINE HDOut_OpenOutput( HydroDyn_ProgDesc, OutRootName,  p, InitOut, ErrSta
 
       ! Passed variables
 
-   TYPE(ProgDesc)               , INTENT( IN    ) :: HydroDyn_ProgDesc
-   CHARACTER(1024),               INTENT( IN    ) :: OutRootName          ! Root name for the output file
-   TYPE(HydroDyn_ParameterType),  INTENT( INOUT ) :: p   
-   TYPE(HydroDyn_InitOutPutType ),INTENT( IN    ) :: InitOut            !
-   INTEGER,                       INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
-   CHARACTER(*),                  INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   TYPE(ProgDesc)          , INTENT( IN    ) :: HD_ProgDesc
+   CHARACTER(1024)         , INTENT( IN    ) :: OutRootName          ! Root name for the output file
+   TYPE(HD_ParameterType)  , INTENT( INOUT ) :: p   
+   TYPE(HD_InitOutPutType ), INTENT( IN    ) :: InitOut            !
+   INTEGER                 , INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
+   CHARACTER(*)            , INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
    
       ! Local variables
    INTEGER                                        :: I                    ! Generic loop counter      
@@ -775,7 +775,7 @@ SUBROUTINE HDOut_OpenOutput( HydroDyn_ProgDesc, OutRootName,  p, InitOut, ErrSta
       
          ! Write the output file header
       
-      WRITE (p%UnOutFile,'(/,A/)', IOSTAT=ErrStat)  'These predictions were generated by '//TRIM(HydroDyn_ProgDesc%Name)//&
+      WRITE (p%UnOutFile,'(/,A/)', IOSTAT=ErrStat)  'These predictions were generated by '//TRIM(HD_ProgDesc%Name)//&
                       ' on '//CurDate()//' at '//CurTime()//'.'
    
          ! Write the names of the output parameters:
@@ -966,12 +966,12 @@ SUBROUTINE HDOut_ChkOutLst( OutList, y, p, ErrStat, ErrMsg )
    
       ! Passed variables
       
-   TYPE(HydroDyn_OutputType),     INTENT( INOUT ) :: y                                ! This module's internal data
-   TYPE(HydroDyn_ParameterType),  INTENT( INOUT ) :: p                                   ! parameter data for this instance of the HD module   
+   TYPE(HD_OutputType),     INTENT( INOUT ) :: y                                ! This module's internal data
+   TYPE(HD_ParameterType),  INTENT( INOUT ) :: p                                   ! parameter data for this instance of the HD module   
 !   INTEGER,                 INTENT(IN   ) :: NumMemberNodes(*)                         ! the number of nodes on each of the first 9 members
-   CHARACTER(10),                 INTENT( IN    ) :: OutList (:)                               ! An array holding the names of the requested output channels.         
-   INTEGER,                       INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
-   CHARACTER(*),                  INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   CHARACTER(10),           INTENT( IN    ) :: OutList (:)                               ! An array holding the names of the requested output channels.         
+   INTEGER,                 INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
+   CHARACTER(*),            INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
    
       ! Local variables.
    
@@ -1074,9 +1074,9 @@ SUBROUTINE HDOut_CloseOutput ( p, ErrStat, ErrMsg )
 
          ! Passed variables
 
-   TYPE(HydroDyn_ParameterType),  INTENT( INOUT ) :: p                    ! parameter data for this instance of the HydroDyn module        
-   INTEGER,                       INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
-   CHARACTER(*),                  INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
+   TYPE(HD_ParameterType),  INTENT( INOUT ) :: p                    ! parameter data for this instance of the HydroDyn module        
+   INTEGER,                 INTENT(   OUT ) :: ErrStat              ! a non-zero value indicates an error occurred           
+   CHARACTER(*),            INTENT(   OUT ) :: ErrMsg               ! Error message if ErrStat /= ErrID_None
 
 !      ! Internal variables
    LOGICAL                               :: Err

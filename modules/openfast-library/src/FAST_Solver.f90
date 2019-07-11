@@ -906,7 +906,7 @@ END SUBROUTINE Transfer_SD_to_HD
 SUBROUTINE Transfer_ED_to_HD( y_ED, u_HD, MeshMapData, ErrStat, ErrMsg )
 !..................................................................................................................................
    TYPE(ED_OutputType),         INTENT(IN   ) :: y_ED                         !< The outputs of the structural dynamics module
-   TYPE(HydroDyn_InputType),    INTENT(INOUT) :: u_HD                         !< HydroDyn input
+   TYPE(HD_InputType),          INTENT(INOUT) :: u_HD                         !< HydroDyn input
    TYPE(FAST_ModuleMapType),    INTENT(INOUT) :: MeshMapData                  !< data for mapping meshes between modules
 
    INTEGER(IntKi),              INTENT(OUT)   :: ErrStat                      !< Error status of the operation
@@ -957,7 +957,7 @@ SUBROUTINE Transfer_ED_to_HD_SD_BD_Mooring( p_FAST, y_ED, u_HD, u_SD, u_ExtPtfm,
 !..................................................................................................................................
    TYPE(FAST_ParameterType),    INTENT(IN)    :: p_FAST                       !< Glue-code simulation parameters
    TYPE(ED_OutputType),         INTENT(IN   ) :: y_ED                         !< The outputs of the structural dynamics module
-   TYPE(HydroDyn_InputType),    INTENT(INOUT) :: u_HD                         !< HydroDyn input
+   TYPE(HD_InputType),          INTENT(INOUT) :: u_HD                         !< HydroDyn input
    TYPE(SD_InputType),          INTENT(INOUT) :: u_SD                         !< SubDyn input
    TYPE(ExtPtfm_InputType),     INTENT(INOUT) :: u_ExtPtfm                    !< ExtPtfm_MCKF input
    TYPE(MAP_InputType),         INTENT(INOUT) :: u_MAP                        !< MAP input
@@ -1226,7 +1226,7 @@ SUBROUTINE Transfer_HD_to_SD( u_mapped, u_SD_LMesh, u_mapped_positions, y_HD, u_
    TYPE(MeshType),                 INTENT(INOUT)  :: u_mapped                 !< temporary copy of SD mesh (an argument to avoid another temporary mesh copy)
    TYPE(MeshType),                 INTENT(INOUT)  :: u_SD_LMesh               !< SD Inputs on LMesh at t (separate so we can call from ED_SD_HD_InputOutput solve with temp meshes)
    TYPE(MeshType),                 INTENT(IN   )  :: u_mapped_positions       !< Mesh sibling of u_mapped, with displaced positions
-   TYPE(HydroDyn_OutputType),      INTENT(IN   )  :: y_HD                     !< HydroDyn outputs
+   TYPE(HD_OutputType),            INTENT(IN   )  :: y_HD                     !< HydroDyn outputs
    TYPE(MeshType),                 INTENT(IN   )  :: u_HD_M_LumpedMesh        !< HydroDyn input mesh (separate so we can call from ED_SD_HD_InputOutput solve with temp meshes)
    TYPE(MeshType),                 INTENT(IN   )  :: u_HD_M_DistribMesh       !< HydroDyn input mesh (separate so we can call from ED_SD_HD_InputOutput solve with temp meshes)
    
@@ -1331,14 +1331,14 @@ SUBROUTINE ED_HD_InputOutputSolve(  this_time, p_FAST, calcJacobian &
    TYPE(ED_MiscVarType)              , INTENT(INOUT) :: m_ED                      !< misc/optimization variables
    
       !HydroDyn: 
-   TYPE(HydroDyn_ContinuousStateType), INTENT(IN   ) :: x_HD                      !< Continuous states
-   TYPE(HydroDyn_DiscreteStateType)  , INTENT(IN   ) :: xd_HD                     !< Discrete states
-   TYPE(HydroDyn_ConstraintStateType), INTENT(IN   ) :: z_HD                      !< Constraint states
-   TYPE(HydroDyn_OtherStateType)     , INTENT(INOUT) :: OtherSt_HD                !< Other states
-   TYPE(HydroDyn_ParameterType)      , INTENT(IN   ) :: p_HD                      !< Parameters
-   TYPE(HydroDyn_InputType)          , INTENT(INOUT) :: u_HD                      !< System inputs
-   TYPE(HydroDyn_OutputType)         , INTENT(INOUT) :: y_HD                      !< System outputs
-   TYPE(HydroDyn_MiscVarType)        , INTENT(INOUT) :: m_HD                      !< misc/optimization variables
+   TYPE(HD_ContinuousStateType), INTENT(IN   ) :: x_HD                      !< Continuous states
+   TYPE(HD_DiscreteStateType)  , INTENT(IN   ) :: xd_HD                     !< Discrete states
+   TYPE(HD_ConstraintStateType), INTENT(IN   ) :: z_HD                      !< Constraint states
+   TYPE(HD_OtherStateType)     , INTENT(INOUT) :: OtherSt_HD                !< Other states
+   TYPE(HD_ParameterType)      , INTENT(IN   ) :: p_HD                      !< Parameters
+   TYPE(HD_InputType)          , INTENT(INOUT) :: u_HD                      !< System inputs
+   TYPE(HD_OutputType)         , INTENT(INOUT) :: y_HD                      !< System outputs
+   TYPE(HD_MiscVarType)        , INTENT(INOUT) :: m_HD                      !< misc/optimization variables
 
       ! MAP/FEAM/MoorDyn:
    TYPE(MAP_OutputType),              INTENT(IN   )  :: y_MAP                     !< MAP outputs
@@ -1367,8 +1367,8 @@ SUBROUTINE ED_HD_InputOutputSolve(  this_time, p_FAST, calcJacobian &
    TYPE(ED_OutputType)                               :: y_ED_input                ! Copy of system outputs sent to this routine (routine input value)
    TYPE(ED_InputType)                                :: u_ED_perturb              ! Perturbed system inputs
    TYPE(ED_OutputType)                               :: y_ED_perturb              ! Perturbed system outputs
-   TYPE(HydroDyn_InputType)                          :: u_HD_perturb              ! Perturbed system inputs
-   TYPE(HydroDyn_OutputType)                         :: y_HD_perturb              ! Perturbed system outputs
+   TYPE(HD_InputType)                                :: u_HD_perturb              ! Perturbed system inputs
+   TYPE(HD_OutputType)                               :: y_HD_perturb              ! Perturbed system outputs
                                                                                   
                                                                                   
    INTEGER(IntKi)                                    :: i                         ! loop counter (jacobian column number)
@@ -1410,9 +1410,9 @@ SUBROUTINE ED_HD_InputOutputSolve(  this_time, p_FAST, calcJacobian &
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )                 
          CALL ED_CopyOutput( y_ED, y_ED_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )         
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         CALL HydroDyn_CopyInput(  u_HD, u_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )           
+         CALL HD_CopyInput(  u_HD, u_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )           
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         CALL HydroDyn_CopyOutput( y_HD, y_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )  
+         CALL HD_CopyOutput( y_HD, y_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )  
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END IF
          
@@ -1447,7 +1447,7 @@ SUBROUTINE ED_HD_InputOutputSolve(  this_time, p_FAST, calcJacobian &
          CALL ED_CalcOutput( this_time, u_ED, p_ED, x_ED, xd_ED, z_ED, OtherSt_ED, y_ED, m_ED, ErrStat2, ErrMsg2 )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                                  
-         CALL HydroDyn_CalcOutput( this_time, u_HD, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD, m_HD, ErrStat2, ErrMsg2 )
+         CALL HD_CalcOutput( this_time, u_HD, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD, m_HD, ErrStat2, ErrMsg2 )
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )      
             
          IF (ErrStat >= AbortErrLev) THEN
@@ -1513,7 +1513,7 @@ SUBROUTINE ED_HD_InputOutputSolve(  this_time, p_FAST, calcJacobian &
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )                                   
                   
                ! calculate outputs with perturbed inputs:
-               CALL HydroDyn_CalcOutput( this_time, u_HD_perturb, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD_perturb, m_HD, ErrStat2, ErrMsg2 )
+               CALL HD_CalcOutput( this_time, u_HD_perturb, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD_perturb, m_HD, ErrStat2, ErrMsg2 )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
                   
                   
@@ -1665,7 +1665,7 @@ CONTAINS
    !...............................................................................................................................
                                   
    TYPE(ED_OutputType)               , INTENT(IN   ) :: y_ED2                  ! System outputs
-   TYPE(HydroDyn_OutputType)         , INTENT(IN   ) :: y_HD2                  ! System outputs
+   TYPE(HD_OutputType)               , INTENT(IN   ) :: y_HD2                  ! System outputs
    REAL(ReKi)                        , INTENT(IN   ) :: u_in(NumInputs)
    REAL(ReKi)                        , INTENT(  OUT) :: U_Resid(NumInputs)
 
@@ -1749,10 +1749,10 @@ CONTAINS
          CALL ED_DestroyOutput(y_ED_perturb, ErrStat3, ErrMsg3 )
             IF (ErrStat3 /= ErrID_None) CALL WrScr(RoutineName//'/ED_DestroyOutput: '//TRIM(ErrMsg3) )
          
-         CALL HydroDyn_DestroyInput( u_HD_perturb, ErrStat3, ErrMsg3 )
-            IF (ErrStat3 /= ErrID_None) CALL WrScr(RoutineName//'/HydroDyn_DestroyInput: '//TRIM(ErrMsg3) )
-         CALL HydroDyn_DestroyOutput(y_HD_perturb, ErrStat3, ErrMsg3 )
-            IF (ErrStat3 /= ErrID_None) CALL WrScr(RoutineName//'/HydroDyn_DestroyOutput: '//TRIM(ErrMsg3) )                        
+         CALL HD_DestroyInput( u_HD_perturb, ErrStat3, ErrMsg3 )
+            IF (ErrStat3 /= ErrID_None) CALL WrScr(RoutineName//'/HD_DestroyInput: '//TRIM(ErrMsg3) )
+         CALL HD_DestroyOutput(y_HD_perturb, ErrStat3, ErrMsg3 )
+            IF (ErrStat3 /= ErrID_None) CALL WrScr(RoutineName//'/HD_DestroyOutput: '//TRIM(ErrMsg3) )                        
       END IF
       
    
@@ -1831,14 +1831,14 @@ SUBROUTINE FullOpt1_InputOutputSolve( this_time, p_FAST, calcJacobian &
    TYPE(ExtPtfm_MiscVarType)         , INTENT(INOUT) :: m_ExtPtfm                 !< misc/optimization variables
           
       !HydroDyn: 
-   TYPE(HydroDyn_ContinuousStateType), INTENT(IN   ) :: x_HD                      !< Continuous states
-   TYPE(HydroDyn_DiscreteStateType)  , INTENT(IN   ) :: xd_HD                     !< Discrete states
-   TYPE(HydroDyn_ConstraintStateType), INTENT(IN   ) :: z_HD                      !< Constraint states
-   TYPE(HydroDyn_OtherStateType)     , INTENT(INOUT) :: OtherSt_HD                !< Other states
-   TYPE(HydroDyn_ParameterType)      , INTENT(IN   ) :: p_HD                      !< Parameters
-   TYPE(HydroDyn_InputType)          , INTENT(INOUT) :: u_HD                      !< System inputs
-   TYPE(HydroDyn_OutputType)         , INTENT(INOUT) :: y_HD                      !< System outputs
-   TYPE(HydroDyn_MiscVarType)        , INTENT(INOUT) :: m_HD                      !< misc/optimization variables
+   TYPE(HD_ContinuousStateType)      , INTENT(IN   ) :: x_HD                      !< Continuous states
+   TYPE(HD_DiscreteStateType)        , INTENT(IN   ) :: xd_HD                     !< Discrete states
+   TYPE(HD_ConstraintStateType)      , INTENT(IN   ) :: z_HD                      !< Constraint states
+   TYPE(HD_OtherStateType)           , INTENT(INOUT) :: OtherSt_HD                !< Other states
+   TYPE(HD_ParameterType)            , INTENT(IN   ) :: p_HD                      !< Parameters
+   TYPE(HD_InputType)                , INTENT(INOUT) :: u_HD                      !< System inputs
+   TYPE(HD_OutputType)               , INTENT(INOUT) :: y_HD                      !< System outputs
+   TYPE(HD_MiscVarType)              , INTENT(INOUT) :: m_HD                      !< misc/optimization variables
    
       !OrcaFlex: 
    TYPE(Orca_ContinuousStateType),     INTENT(IN   ) :: x_Orca                    !< Continuous states
@@ -1884,8 +1884,8 @@ SUBROUTINE FullOpt1_InputOutputSolve( this_time, p_FAST, calcJacobian &
    TYPE(ED_OutputType)                               :: y_ED_perturb              ! Perturbed system outputs
    TYPE(SD_InputType)                                :: u_SD_perturb              ! Perturbed system inputs
    TYPE(SD_OutputType)                               :: y_SD_perturb              ! Perturbed system outputs
-   TYPE(HydroDyn_InputType)                          :: u_HD_perturb              ! Perturbed system inputs
-   TYPE(HydroDyn_OutputType)                         :: y_HD_perturb              ! Perturbed system outputs
+   TYPE(HD_InputType)                                :: u_HD_perturb              ! Perturbed system inputs
+   TYPE(HD_OutputType)                               :: y_HD_perturb              ! Perturbed system outputs
    TYPE(BD_InputType)                                :: u_BD_perturb              ! Perturbed system inputs
    TYPE(BD_OutputType), ALLOCATABLE                  :: y_BD_perturb(:)           ! Perturbed system outputs
    TYPE(Orca_InputType)                              :: u_Orca_perturb            ! Perturbed system inputs
@@ -1943,9 +1943,9 @@ SUBROUTINE FullOpt1_InputOutputSolve( this_time, p_FAST, calcJacobian &
          END IF
             
          IF ( p_FAST%CompHydro == Module_HD ) THEN            
-            CALL HydroDyn_CopyInput(  u_HD, u_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )           
+            CALL HD_CopyInput(  u_HD, u_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )           
                CALL SetErrStat( ErrStat2, 'u_HD_perturb:'//ErrMsg2, ErrStat, ErrMsg, RoutineName  )
-            CALL HydroDyn_CopyOutput( y_HD, y_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )  
+            CALL HD_CopyOutput( y_HD, y_HD_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2 )  
                CALL SetErrStat( ErrStat2, 'y_HD_perturb:'//ErrMsg2, ErrStat, ErrMsg, RoutineName  )
          END IF
          
@@ -2016,7 +2016,7 @@ SUBROUTINE FullOpt1_InputOutputSolve( this_time, p_FAST, calcJacobian &
          END IF
             
          IF ( p_FAST%CompHydro == Module_HD ) THEN 
-            CALL HydroDyn_CalcOutput( this_time, u_HD, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD, m_HD, ErrStat2, ErrMsg2 )
+            CALL HD_CalcOutput( this_time, u_HD, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD, m_HD, ErrStat2, ErrMsg2 )
                CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName  )
          END IF
          
@@ -2116,17 +2116,17 @@ SUBROUTINE FullOpt1_InputOutputSolve( this_time, p_FAST, calcJacobian &
             !...............................
             ! Get HydroDyn's contribution: (note if p_FAST%CompHydro /= Module_HD, SizeJac_Opt1(4) = 0)
             !...............................             
-            DO j=1,p_FAST%SizeJac_Opt1(4) !call HydroDyn_CalcOutput            
+            DO j=1,p_FAST%SizeJac_Opt1(4) !call HD_CalcOutput            
                i = i + 1 ! i = j + p_FAST%SizeJac_Opt1(2) + p_FAST%SizeJac_Opt1(3) 
 
                ! perturb u_HD:
-               CALL HydroDyn_CopyInput(  u_HD, u_HD_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
+               CALL HD_CopyInput(  u_HD, u_HD_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName  )
                u_perturb = u            
                CALL Perturb_u_FullOpt1( p_FAST, MeshMapData%Jac_u_indx, i, u_perturb, u_HD_perturb=u_HD_perturb, perturb=ThisPerturb ) ! perturb u and u_HD by ThisPerturb [routine sets ThisPerturb]
                   
                ! calculate outputs with perturbed inputs:
-               CALL HydroDyn_CalcOutput( this_time, u_HD_perturb, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD_perturb, m_HD, ErrStat2, ErrMsg2 )
+               CALL HD_CalcOutput( this_time, u_HD_perturb, p_HD, x_HD, xd_HD, z_HD, OtherSt_HD, y_HD_perturb, m_HD, ErrStat2, ErrMsg2 )
                   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName  )
                   
                CALL U_FullOpt1_Residual(y_ED, y_SD, y_HD_perturb, y_BD, y_Orca, y_ExtPtfm, u_perturb, Fn_U_perturb) ! get this perturbation  
@@ -2558,7 +2558,7 @@ CONTAINS
                                   
    TYPE(ED_OutputType)               , INTENT(IN   ) :: y_ED2                  ! System outputs
    TYPE(SD_OutputType)               , INTENT(IN   ) :: y_SD2                  ! System outputs
-   TYPE(HydroDyn_OutputType)         , INTENT(IN   ) :: y_HD2                  ! System outputs
+   TYPE(HD_OutputType)               , INTENT(IN   ) :: y_HD2                  ! System outputs
    TYPE(BD_OutputType)               , INTENT(IN   ) :: y_BD2(:)               ! System outputs
    TYPE(Orca_OutputType)             , INTENT(IN   ) :: y_Orca2                ! System outputs
    TYPE(ExtPtfm_OutputType)          , INTENT(IN   ) :: y_ExtPtfm2             ! System outputs
@@ -2875,9 +2875,9 @@ CONTAINS
          CALL SD_DestroyOutput(y_SD_perturb, ErrStat3, ErrMsg3 )
             IF (ErrStat3 /= ErrID_None) CALL WrScr(' '//RoutineName//TRIM(ErrMsg3) )
 
-         CALL HydroDyn_DestroyInput( u_HD_perturb, ErrStat3, ErrMsg3 )
+         CALL HD_DestroyInput( u_HD_perturb, ErrStat3, ErrMsg3 )
             IF (ErrStat3 /= ErrID_None) CALL WrScr(' '//RoutineName//TRIM(ErrMsg3) )
-         CALL HydroDyn_DestroyOutput(y_HD_perturb, ErrStat3, ErrMsg3 )
+         CALL HD_DestroyOutput(y_HD_perturb, ErrStat3, ErrMsg3 )
             IF (ErrStat3 /= ErrID_None) CALL WrScr(' '//RoutineName//TRIM(ErrMsg3) )
             
          CALL BD_DestroyInput( u_BD_perturb, ErrStat3, ErrMsg3 )
@@ -3432,7 +3432,7 @@ SUBROUTINE Add_FullOpt1_u_delta( p_FAST, Jac_u_indx, u_delta, u_ED, u_SD, u_HD, 
    REAL( ReKi )                        , INTENT(IN   ) :: u_delta(:)       !< The delta amount to add to the appropriate mesh fields 
    TYPE(ED_InputType)                  , INTENT(INOUT) :: u_ED             !< ED System inputs 
    TYPE(SD_InputType)                  , INTENT(INOUT) :: u_SD             !< SD System inputs 
-   TYPE(HydroDyn_InputType)            , INTENT(INOUT) :: u_HD             !< SD System inputs 
+   TYPE(HD_InputType)                  , INTENT(INOUT) :: u_HD             !< SD System inputs 
    TYPE(BD_InputType)                  , INTENT(INOUT) :: u_BD(:)          !< BD System inputs 
    TYPE(Orca_InputType)                , INTENT(INOUT) :: u_Orca           !< Orca System inputs 
    TYPE(ExtPtfm_InputType)             , INTENT(INOUT) :: u_ExtPtfm        !< ExtPtfm System inputs 
@@ -3521,7 +3521,7 @@ SUBROUTINE Perturb_u_FullOpt1( p_FAST, Jac_u_indx, n, u_perturb, u_ED_perturb, u
    REAL( ReKi )                        , INTENT(INOUT) :: u_perturb(:)           !< array to be perturbed
    TYPE(ED_InputType),        OPTIONAL , INTENT(INOUT) :: u_ED_perturb           !< ED System inputs  (needed only when                                  1 <= n <= NumEDNodes)
    TYPE(SD_InputType),        OPTIONAL , INTENT(INOUT) :: u_SD_perturb           !< SD System inputs  (needed only when NumEDNodes                      +1 <= n <= NumEDNodes+NumSDNodes) [if SD is used] 
-   TYPE(HydroDyn_InputType),  OPTIONAL , INTENT(INOUT) :: u_HD_perturb           !< HD System inputs  (needed only when NumEDNodes+NumSDNodes           +1 <= n <= NumEDNodes+NumSDNodes+NumHDNodes) [if HD is used and SD is used. if SD not used, 
+   TYPE(HD_InputType),        OPTIONAL , INTENT(INOUT) :: u_HD_perturb           !< HD System inputs  (needed only when NumEDNodes+NumSDNodes           +1 <= n <= NumEDNodes+NumSDNodes+NumHDNodes) [if HD is used and SD is used. if SD not used, 
    TYPE(BD_InputType),        OPTIONAL , INTENT(INOUT) :: u_BD_perturb           !< BD System inputs  (needed only when NumEDNodes+NumSDNodes+NumHDNodes+1 <= n <= inf) [if BD is used]
    TYPE(Orca_InputType),      OPTIONAL , INTENT(INOUT) :: u_Orca_perturb         !< Orca System inputs  (needed only when NumEDNodes+NumSDNodes+NumHDNodes+NumBDNodes+1 <= n <= inf) [if Orca is used]
    TYPE(ExtPtfm_InputType),   OPTIONAL , INTENT(INOUT) :: u_ExtPtfm_perturb      !< ExtPtfm System inputs  (needed only when NumEDNodes+NumSDNodes+NumHDNodes+NumBDNodes+NumOcraNodes+1 <= n <= inf) [if ExtPtfm is used]
@@ -5068,20 +5068,20 @@ SUBROUTINE FAST_AdvanceStates( t_initial, n_t_global, p_FAST, y_FAST, m_FAST, ED
 
    ! HydroDyn: get predicted states
    IF ( p_FAST%CompHydro == Module_HD ) THEN
-      CALL HydroDyn_CopyContState   (HD%x( STATE_CURR), HD%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyContState   (HD%x( STATE_CURR), HD%x( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyDiscState   (HD%xd(STATE_CURR), HD%xd(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)  
+      CALL HD_CopyDiscState   (HD%xd(STATE_CURR), HD%xd(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)  
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      CALL HydroDyn_CopyConstrState (HD%z( STATE_CURR), HD%z( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyConstrState (HD%z( STATE_CURR), HD%z( STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )            
-      CALL HydroDyn_CopyOtherState( HD%OtherSt(STATE_CURR), HD%OtherSt(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+      CALL HD_CopyOtherState( HD%OtherSt(STATE_CURR), HD%OtherSt(STATE_PRED), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          
       DO j_ss = 1, p_FAST%n_substeps( Module_HD )
          n_t_module = n_t_global*p_FAST%n_substeps( Module_HD ) + j_ss - 1
          t_module   = n_t_module*p_FAST%dt_module( Module_HD ) + t_initial
                
-         CALL HydroDyn_UpdateStates( t_module, n_t_module, HD%Input, HD%InputTimes, HD%p, HD%x(STATE_PRED), HD%xd(STATE_PRED), &
+         CALL HD_UpdateStates( t_module, n_t_module, HD%Input, HD%InputTimes, HD%p, HD%x(STATE_PRED), HD%xd(STATE_PRED), &
                                      HD%z(STATE_PRED), HD%OtherSt(STATE_PRED), HD%m, ErrStat2, ErrMsg2 )
             CALL SetErrStat( Errstat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END DO !j_ss
@@ -5457,26 +5457,26 @@ SUBROUTINE FAST_ExtrapInterpMods( t_global_next, p_FAST, y_FAST, m_FAST, ED, BD,
       ! HydroDyn
       IF ( p_FAST%CompHydro == Module_HD ) THEN
 
-         CALL HydroDyn_Input_ExtrapInterp(HD%Input, HD%InputTimes, HD%u, t_global_next, ErrStat2, ErrMsg2)
+         CALL HD_Input_ExtrapInterp(HD%Input, HD%InputTimes, HD%u, t_global_next, ErrStat2, ErrMsg2)
             CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName )
             
-         !CALL HydroDyn_Output_ExtrapInterp(HD_Output, HD_OutputTimes, HD%y, t_global_next, ErrStat2, ErrMsg2)
+         !CALL HD_Output_ExtrapInterp(HD_Output, HD_OutputTimes, HD%y, t_global_next, ErrStat2, ErrMsg2)
          !   CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName )
             
          ! Shift "window" of HD%Input and HD_Output
             
          DO j = p_FAST%InterpOrder, 1, -1
 
-            CALL HydroDyn_CopyInput (HD%Input(j),  HD%Input(j+1),  MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+            CALL HD_CopyInput (HD%Input(j),  HD%Input(j+1),  MESH_UPDATECOPY, ErrStat2, ErrMsg2)
                CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName )
-            !CALL HydroDyn_CopyOutput(HD_Output(j), HD_Output(j+1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+            !CALL HD_CopyOutput(HD_Output(j), HD_Output(j+1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
             HD%InputTimes(j+1) = HD%InputTimes(j)
             !HD_OutputTimes(j+1)= HD_OutputTimes(j)
          END DO
 
-         CALL HydroDyn_CopyInput (HD%u,  HD%Input(1),  MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         CALL HD_CopyInput (HD%u,  HD%Input(1),  MESH_UPDATECOPY, Errstat2, ErrMsg2)
             CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName )
-         !CALL HydroDyn_CopyOutput(HD%y,  HD_Output(1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
+         !CALL HD_CopyOutput(HD%y,  HD_Output(1), MESH_UPDATECOPY, Errstat2, ErrMsg2)
          HD%InputTimes(1) = t_global_next          
          !HD_OutputTimes(1) = t_global_next
             
